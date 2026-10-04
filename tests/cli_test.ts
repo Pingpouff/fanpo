@@ -1,10 +1,12 @@
 import { runCli } from "../src/cli.ts";
 import { FantasyClient } from "../src/client.ts";
-import type { PlayersResponse } from "../src/types.ts";
+import type { PlayerSheetResponse, PlayersResponse } from "../src/types.ts";
 import { assert, equal, rejects } from "./helpers.ts";
-import { response } from "./fixtures.ts";
+import { response, sheetResponse } from "./fixtures.ts";
 
-function client(payload = response): FantasyClient {
+function client(
+  payload: PlayersResponse | PlayerSheetResponse = response,
+): FantasyClient {
   return new FantasyClient({
     baseUrl: "https://example.test",
     token: "test-token",
@@ -97,4 +99,191 @@ Deno.test("CLI propagates HTTP errors instead of producing JSON", async () => {
     fetch: () => Promise.resolve(new Response(null, { status: 401 })),
   });
   await rejects(() => runCli(["players", "--json"], failingClient), "HTTP 401");
+});
+
+Deno.test("player CLI JSON emits the full sheet including evolving statistics", async () => {
+  const output: PlayerSheetResponse = JSON.parse(
+    await runCli(
+      ["player", "825", "--json", "--detailed"],
+      client(sheetResponse),
+    ),
+  );
+  equal(output, sheetResponse);
+  equal(output.perfs[0].stats.future_numeric_stat, 12.5);
+});
+
+Deno.test("player quick JSON omits only aggregate and match stats", async () => {
+  const output = JSON.parse(
+    await runCli(["player", "825", "--json"], client(sheetResponse)),
+  );
+  assert(!("stats" in output));
+  assert(
+    output.perfs.every((perf: Record<string, unknown>) => !("stats" in perf)),
+  );
+  equal(output.joueur, sheetResponse.joueur);
+  equal(output.selection, sheetResponse.selection);
+  equal(output.perfs[0].note, "83.76");
+  equal(output.perfs[0].extra_performance_field, "preserved");
+  equal(output.extra_sheet_field, "preserved");
+  equal(sheetResponse.perfs[0].stats.tackles, 17);
+  equal(sheetResponse.stats.moyenne, 73.915);
+});
+
+Deno.test("player stats alias emits the complete JSON response", async () => {
+  equal(
+    JSON.parse(
+      await runCli(
+        ["player", "825", "--stats", "--json"],
+        client(sheetResponse),
+      ),
+    ),
+    sheetResponse,
+  );
+});
+
+Deno.test("player detailed terminal view includes aggregate and each round's match stats", async () => {
+  for (const flag of ["--detailed", "--stats"]) {
+    const output = await runCli(["player", "825", flag], client(sheetResponse));
+    for (
+      const text of [
+        "Beka Gorgadze",
+        "Aggregate stats",
+        "points_marques",
+        "Round 1 stats",
+        "Round 2 stats",
+        "tackles",
+        "17",
+        "future_numeric_stat",
+        "12.5",
+      ]
+    ) {
+      assert(output.includes(text), `Missing ${text}`);
+    }
+  }
+});
+
+Deno.test("player CLI displays a compact identity, performance and aggregate summary", async () => {
+  const output = await runCli(["player", "825"], client(sheetResponse));
+  for (
+    const text of [
+      "Beka Gorgadze",
+      "Section Paloise",
+      "N8 / TL",
+      "Value: 0.94",
+      "Round",
+      "Opp",
+      "H/A",
+      "Starter",
+      "Min",
+      "Score",
+      "MHR",
+      "Away",
+      "yes",
+      "65",
+      "83.76",
+      "AB",
+      "Home",
+      "no",
+      "28",
+      "64.07",
+      "Average: 73.92",
+      "Best: 83.76",
+      "Worst: 64.07",
+      "Tries: 0",
+    ]
+  ) {
+    assert(output.includes(text), `Missing ${text}`);
+  }
+  assert(!output.includes("tackles"));
+  assert(!output.includes("future_numeric_stat"));
+});
+
+Deno.test("player CLI handles no performances and nullable scores and positions", async () => {
+  const sheet: PlayerSheetResponse = {
+    ...sheetResponse,
+    joueur: {
+      ...sheetResponse.joueur,
+      taille_cm: null,
+      poids_kg: null,
+      poste_secondaire: null,
+    },
+    perfs: [],
+    stats: {
+      ...sheetResponse.stats,
+      moyenne: null,
+      meilleure: null,
+      pire: null,
+    },
+  };
+  const output = await runCli(["player", "825"], client(sheet));
+  assert(output.includes("No performances yet."));
+  assert(output.includes("Average: -"));
+  assert(output.includes("Best: -"));
+  assert(!output.includes("null"));
+  assert(!output.includes("N8 /"));
+});
+
+Deno.test("player CLI distinguishes unknown status from substitute and away", async () => {
+  const sheet: PlayerSheetResponse = {
+    ...sheetResponse,
+    perfs: [{
+      ...sheetResponse.perfs[0],
+      note: null,
+      minutes_jouees: null,
+      titulaire: null,
+      poste_joue: null,
+      domicile: null,
+    }],
+  };
+  const output = await runCli(["player", "825"], client(sheet));
+  assert(!output.includes("Away"));
+  assert(!output.includes("yes"));
+  assert(!output.includes("no"));
+  assert(!output.includes("null"));
+});
+
+Deno.test("player CLI rejects missing, malformed and unsafe IDs and unsupported options", async () => {
+  for (
+    const args of [
+      ["player"],
+      ["player", "0"],
+      ["player", "-1"],
+      ["player", "1.5"],
+      ["player", "825/fiche"],
+      ["player", "NaN"],
+      ["player", "1e3"],
+      ["player", "9007199254740992"],
+    ]
+  ) {
+    await rejects(() => runCli(args), "player ID");
+  }
+  for (
+    const args of [["player", "825", "--club", "SP"], ["player", "825", "826"]]
+  ) {
+    await rejects(() => runCli(args), "Unknown option");
+  }
+});
+
+Deno.test("player CLI help needs no configuration or network", async () => {
+  for (
+    const args of [["player", "--help"], ["player", "-h"], [
+      "player",
+      "825",
+      "--help",
+    ]]
+  ) {
+    assert((await runCli(args)).includes("player <id>"));
+  }
+});
+
+Deno.test("player CLI propagates missing-player HTTP errors", async () => {
+  const failingClient = new FantasyClient({
+    baseUrl: "https://example.test",
+    token: "test-token",
+    fetch: () => Promise.resolve(new Response(null, { status: 404 })),
+  });
+  await rejects(
+    () => runCli(["player", "825", "--json"], failingClient),
+    "HTTP 404",
+  );
 });

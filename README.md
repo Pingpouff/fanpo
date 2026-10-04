@@ -1,7 +1,8 @@
 # Fantasy Rugby connector
 
 A small Deno/TypeScript client for the API at <https://fantasy.poneeey.fr>, with
-a CLI for inspecting players. No external dependencies or build step.
+a CLI for inspecting players and their detailed sheets. No external dependencies
+or build step.
 
 ## Setup
 
@@ -39,6 +40,10 @@ deno task cli players --position PIL
 deno task cli players --name Bamba
 deno task cli players --available
 deno task cli players --club UBB --position PIL --available --json
+deno task cli player 825
+deno task cli player 825 --json
+deno task cli player 825 --detailed
+deno task cli player 825 --detailed --json | jq '.perfs[].stats.tackles'
 ```
 
 Club codes match exactly, ignoring case. Position codes match the primary,
@@ -51,6 +56,27 @@ Normal output is a table. JSON output retains the complete API envelope,
 including `journee` and extra fields, with a filtered `joueurs` array. There is
 no extra text on stdout; errors go to stderr and exit with status 1. Deno task
 diagnostics also go to stderr, so stdout remains suitable for `jq`.
+
+`player <id>` retrieves `/api/joueurs/<id>/fiche`. IDs must be positive safe
+integers. Human output shows identity, club, positions, current value, a compact
+performance table and aggregate scores. Unknown performance values display as
+`-`. The default is a quick view: quick JSON omits the top-level `stats` object
+and each performance's `stats`, retaining all other fields.
+
+Use `--detailed` (alias `--stats`) for the detailed view. Detailed terminal
+output adds aggregate and per-round stat fields; `--detailed --json` preserves
+the complete API response, including all detailed match stats and extra fields.
+The client always returns the complete sheet; these views affect only CLI
+output. The list filters apply only to `players`.
+
+If you keep your token in the ignored `.env` file, load it with Deno's native
+flag:
+
+```bash
+deno run --env-file=.env --no-prompt \
+  --allow-env=FANTASY_TOKEN,FANTASY_API_URL \
+  --allow-net=fantasy.poneeey.fr:443 src/cli.ts player 825 --detailed --json
+```
 
 The default task grants access only to the two environment variables and
 `fantasy.poneeey.fr:443`. To use a different API origin, grant its host and port
@@ -74,6 +100,9 @@ import { loadConfig } from "./src/config.ts";
 const client = new FantasyClient(loadConfig());
 const response = await client.getPlayers();
 console.log(response.joueurs.length);
+
+const sheet = await client.getPlayerSheet(825);
+console.log(sheet.perfs[0]?.stats.tackles);
 ```
 
 Public connector API:
@@ -82,12 +111,19 @@ Public connector API:
   fetch and may be supplied for offline tests.
 - `client.getPlayers(): Promise<PlayersResponse>`: authenticated
   `GET /api/joueurs` with `Accept: application/json`.
+- `client.getPlayerSheet(playerId): Promise<PlayerSheetResponse>`: authenticated
+  `GET /api/joueurs/<id>/fiche` using the same HTTP handling. Invalid IDs throw
+  before requesting the API.
 - `FantasyHttpError`: non-2xx failures include the numeric `status` and
   endpoint. Response bodies are omitted from error messages.
 - `loadConfig()`: reads `FANTASY_TOKEN` and `FANTASY_API_URL`; returns
   `{ baseUrl, token }`.
 - `Player`, `Matchday`, `PlayersResponse`: TypeScript interfaces in
   `src/types.ts`.
+- `PlayerSheetResponse`, `PlayerSheetPlayer`, `PlayerPerformance`,
+  `PlayerSelection`, `PlayerAggregateStats`: sheet interfaces in `src/types.ts`.
+  `PlayerMatchStats` is `Record<string, number>` so stat keys can evolve without
+  enumerating them in the connector.
 - `filterPlayers(players, filters?)`: optional, nonmutating local filters.
 
 Network and malformed JSON failures have contextual errors. Redirects are
@@ -111,3 +147,12 @@ The API models follow the supplied response example. Additional API fields are
 allowed and preserved, but the known fields are trusted rather than validated at
 runtime. Production schema compatibility has not been verified with a live
 token.
+
+For sheets, measurements and secondary/tertiary positions can be null.
+Performance scores, minutes, starter status, played position, opponent, result,
+home/away status and `pm` are typed as nullable to accommodate unplayed or
+unknown performance values. Aggregate average/best/worst scores may be null when
+no matches have been played. These nullability choices are assumptions; fixtures
+follow the supplied example rather than a captured live sheet. Selection and
+aggregate objects are assumed to be present, and detailed match stat values are
+assumed to be numeric.

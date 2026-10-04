@@ -1,4 +1,4 @@
-import type { PlayersResponse } from "./types.ts";
+import type { PlayerSheetResponse, PlayersResponse } from "./types.ts";
 
 export interface FantasyClientOptions {
   baseUrl: string;
@@ -45,6 +45,13 @@ export class FantasyClient {
 
   getPlayers(): Promise<PlayersResponse> {
     return this.#get<PlayersResponse>("/api/joueurs");
+  }
+
+  getPlayerSheet(playerId: number): Promise<PlayerSheetResponse> {
+    if (!Number.isSafeInteger(playerId) || playerId <= 0) {
+      throw new Error("Fantasy API player ID must be a positive safe integer.");
+    }
+    return this.#get<PlayerSheetResponse>(`/api/joueurs/${playerId}/fiche`);
   }
 
   async #get<T>(path: string): Promise<T> {

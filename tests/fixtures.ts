@@ -1,4 +1,8 @@
-import type { Player, PlayersResponse } from "../src/types.ts";
+import type {
+  Player,
+  PlayerSheetResponse,
+  PlayersResponse,
+} from "../src/types.ts";
 
 export function player(overrides: Partial<Player> = {}): Player {
   return {
@@ -42,4 +46,70 @@ export const response: PlayersResponse = {
     }),
   ],
   additional_response_field: "preserved",
+};
+
+export const sheetResponse: PlayerSheetResponse = {
+  joueur: {
+    id: 825,
+    nom: "Gorgadze",
+    prenom: "Beka",
+    nationalite: "GEO",
+    taille_cm: 189,
+    poids_kg: 110,
+    indisponible: false,
+    poste_principal: "N8",
+    poste_secondaire: "TL",
+    poste_tertiaire: null,
+    club: "SP",
+    club_nom: "Section Paloise",
+    valeur: "0.94",
+    valeur_initiale: "0.92",
+    extra_identity_field: "preserved",
+  },
+  perfs: [{
+    numero: 1,
+    note: "83.76",
+    minutes_jouees: 65,
+    titulaire: true,
+    poste_joue: "N8",
+    consolidee: true,
+    stats: { tackles: 17, tries: 0, future_numeric_stat: 12.5 },
+    pm: 8,
+    adversaire: "MHR",
+    resultat: "V",
+    domicile: false,
+    extra_performance_field: "preserved",
+  }, {
+    numero: 2,
+    note: "64.07",
+    minutes_jouees: 28,
+    titulaire: false,
+    poste_joue: "TL",
+    consolidee: true,
+    stats: { tackles: 3 },
+    pm: 0,
+    adversaire: "AB",
+    resultat: "D",
+    domicile: true,
+  }],
+  selection: {
+    journee: 5,
+    source: "en_cours",
+    total: 10037,
+    pct: 14.9,
+    rare: 1,
+    populaire: 30,
+    extra_selection_field: true,
+  },
+  stats: {
+    matchs: 2,
+    matchs_total: 2,
+    moyenne: 73.915,
+    meilleure: 83.76,
+    pire: 64.07,
+    essais: 0,
+    points_marques: 0,
+    extra_aggregate_field: 42,
+  },
+  extra_sheet_field: "preserved",
 };

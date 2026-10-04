@@ -1,6 +1,6 @@
 import { FantasyClient, FantasyHttpError } from "../src/client.ts";
 import { assert, equal, rejects, throws } from "./helpers.ts";
-import { response } from "./fixtures.ts";
+import { response, sheetResponse } from "./fixtures.ts";
 
 Deno.test("client sends the endpoint and headers and preserves additional fields", async () => {
   let calls = 0;
@@ -80,4 +80,58 @@ Deno.test("client rejects empty tokens and invalid base URLs before fetching", (
       "base URL",
     );
   }
+});
+
+Deno.test("player sheet uses the ID endpoint and shared authentication and preserves stats", async () => {
+  const client = new FantasyClient({
+    baseUrl: "https://example.test",
+    token: "test-token",
+    fetch: (url, init) => {
+      equal(url.href, "https://example.test/api/joueurs/825/fiche");
+      const headers = new Headers(init.headers);
+      equal(headers.get("authorization"), "Bearer test-token");
+      equal(headers.get("accept"), "application/json");
+      equal(init.method, "GET");
+      return Promise.resolve(Response.json(sheetResponse));
+    },
+  });
+  const sheet = await client.getPlayerSheet(825);
+  equal(sheet, sheetResponse);
+  const evolvingStat: number = sheet.perfs[0].stats.future_numeric_stat;
+  equal(evolvingStat, 12.5);
+  equal(sheet.perfs[0].stats.tackles, 17);
+});
+
+Deno.test("player sheet propagates missing-player and other HTTP statuses", async () => {
+  for (const status of [404, 401, 500]) {
+    const client = new FantasyClient({
+      baseUrl: "https://example.test",
+      token: "test-token",
+      fetch: () => Promise.resolve(new Response("private body", { status })),
+    });
+    const error = await rejects(
+      () => client.getPlayerSheet(825),
+      `HTTP ${status}`,
+    );
+    assert(error instanceof FantasyHttpError);
+    equal(error.status, status);
+    assert(error.message.includes("/api/joueurs/825/fiche"));
+    assert(!error.message.includes("private body"));
+  }
+});
+
+Deno.test("player sheet rejects invalid IDs before fetching", () => {
+  let calls = 0;
+  const client = new FantasyClient({
+    baseUrl: "https://example.test",
+    token: "test-token",
+    fetch: () => {
+      calls++;
+      return Promise.resolve(Response.json(sheetResponse));
+    },
+  });
+  for (const id of [0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    throws(() => client.getPlayerSheet(id), "positive safe integer");
+  }
+  equal(calls, 0);
 });
