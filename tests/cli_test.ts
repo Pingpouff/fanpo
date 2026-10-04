@@ -1,4 +1,5 @@
 import { runCli } from "../src/cli.ts";
+import { ValidationError } from "@cliffy/command";
 import { FantasyClient } from "../src/client.ts";
 import type { PlayerSheetResponse, PlayersResponse } from "../src/types.ts";
 import { assert, equal, rejects } from "./helpers.ts";
@@ -79,16 +80,20 @@ Deno.test("CLI help works without environment or network permissions", async () 
 
 Deno.test("CLI rejects unknown commands, options and missing filter values before fetching", async () => {
   for (
-    const [args, message] of [
-      [["teams"], "Unknown command"],
-      [["players", "--unknown"], "Unknown option"],
-      [["players", "extra"], "Unknown option"],
-      [["players", "--club"], "requires a value"],
-      [["players", "--name", "--json"], "requires a value"],
-      [["players", "--position", "  "], "requires a value"],
-    ] as const
+    const args of [
+      ["teams"],
+      ["players", "--unknown"],
+      ["players", "extra"],
+      ["players", "--club"],
+      ["players", "--name", "--json"],
+      ["players", "--position", "  "],
+    ]
   ) {
-    await rejects(() => runCli([...args]), message);
+    const error = await rejects(() => runCli(args), "");
+    assert(
+      error instanceof ValidationError,
+      `${JSON.stringify(args)}: ${error.name} ${error.message}`,
+    );
   }
 });
 
@@ -255,13 +260,32 @@ Deno.test("player CLI rejects missing, malformed and unsafe IDs and unsupported 
       ["player", "9007199254740992"],
     ]
   ) {
-    await rejects(() => runCli(args), "player ID");
+    const error = await rejects(() => runCli(args), "");
+    assert(error instanceof ValidationError);
   }
   for (
     const args of [["player", "825", "--club", "SP"], ["player", "825", "826"]]
   ) {
-    await rejects(() => runCli(args), "Unknown option");
+    const error = await rejects(() => runCli(args), "");
+    assert(error instanceof ValidationError);
   }
+});
+
+Deno.test("CLI accepts equals syntax for string filters", async () => {
+  const output = JSON.parse(
+    await runCli(["players", "--club=UBB", "--name=Bamba", "--json"], client()),
+  );
+  equal(output.joueurs.map((player: { id: number }) => player.id), [1]);
+});
+
+Deno.test("generated help shows only options belonging to the selected command", async () => {
+  const playersHelp = await runCli(["players", "--help"]);
+  assert(playersHelp.includes("--club"));
+  assert(!playersHelp.includes("--detailed"));
+  const playerHelp = await runCli(["player", "--help"]);
+  assert(playerHelp.includes("--detailed"));
+  assert(playerHelp.includes("--stats"));
+  assert(!playerHelp.includes("--club"));
 });
 
 Deno.test("player CLI help needs no configuration or network", async () => {

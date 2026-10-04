@@ -5,5 +5,8 @@
     "lint": "deno lint",
     "check": "deno fmt --check && deno lint && deno check src/*.ts tests/*.ts",
     "test": "deno test"
+  },
+  "imports": {
+    "@cliffy/command": "jsr:@cliffy/command@1.3.1"
   }
 }

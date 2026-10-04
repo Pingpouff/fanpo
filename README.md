@@ -1,14 +1,20 @@
 # Fantasy Rugby connector
 
 A small Deno/TypeScript client for the API at <https://fantasy.poneeey.fr>, with
-a CLI for inspecting players and their detailed sheets. No external dependencies
-or build step.
+a CLI for inspecting players and their detailed sheets, with Cliffy for argument
+parsing and generated help. No build step.
 
 ## Setup
 
 Use Deno 2.9 or later, as recommended by `deno.com-agents.md`. Development
 checks also pass on the available Deno 2.6.10 runtime; upgrading in this
 environment failed because the download host could not be resolved.
+
+Install the declared dependency once:
+
+```bash
+deno install
+```
 
 Set your Bearer token in the environment. In Bash, you can enter it without
 echoing it or recording it in shell history:
@@ -41,6 +47,8 @@ resolve from the origin: `getPlayers()` always requests `/api/joueurs`.
 
 ```bash
 deno task cli --help
+deno task cli players --help
+deno task cli player --help
 deno task cli players
 deno task cli players --json
 deno task cli players --json | jq '.joueurs[]'
@@ -59,7 +67,9 @@ Club codes match exactly, ignoring case. Position codes match the primary,
 secondary or tertiary position, ignoring case. Names match a substring of
 `prenom nom`, ignoring case. `--available` excludes players whose `indisponible`
 field is true. Combined filters use AND and run locally on the fetched response.
-String options take a separate argument, for example `--name 'Demba Bamba'`.
+String options take a separate argument, for example `--name 'Demba Bamba'`. The
+`--name='Demba Bamba'` form also works. Cliffy generates help from the command
+definitions and rejects unknown options, missing values and extra arguments.
 
 Normal output is a table. JSON output retains the complete API envelope,
 including `journee` and extra fields, with a filtered `joueurs` array. There is
@@ -149,6 +159,11 @@ deno task test
 tests. Tests run without runtime permissions or production API access; they use
 fake fetch responses to exercise the client and CLI. Test fixtures are
 synthetic, not a captured production payload.
+
+`src/cli.ts` defines commands and handles terminal I/O. `src/cli_output.ts`
+contains the pure output functions for tables and quick/detailed views. The API
+client is independent of Cliffy. `runCli()` returns output without printing or
+exiting, which keeps help, validation and command execution testable.
 
 The API models follow the supplied response example. Additional API fields are
 allowed and preserved, but the known fields are trusted rather than validated at
