@@ -21,8 +21,17 @@ export FANTASY_TOKEN
 
 `FANTASY_TOKEN` is required; missing or blank tokens fail clearly. Never put a
 real token in source or commit it. `.env` and `.env.*` are ignored as a
-precaution; the CLI reads the process environment and does not load these files
-automatically.
+precaution. `deno task cli` automatically loads `.env` from the project root.
+Variables already exported in your terminal take precedence over `.env` values.
+
+You can keep your configuration in `.env`:
+
+```dotenv
+FANTASY_TOKEN=your_token_here
+FANTASY_API_URL=https://fantasy.poneeey.fr
+```
+
+Paste the token without the `Bearer` prefix. The URL is optional.
 
 `FANTASY_API_URL` is optional and defaults to `https://fantasy.poneeey.fr`. Use
 an absolute HTTP(S) base URL without embedded credentials. Endpoint paths
@@ -69,13 +78,11 @@ the complete API response, including all detailed match stats and extra fields.
 The client always returns the complete sheet; these views affect only CLI
 output. The list filters apply only to `players`.
 
-If you keep your token in the ignored `.env` file, load it with Deno's native
-flag:
+The CLI task includes `.env` loading and the required permissions, so no extra
+flags are needed:
 
 ```bash
-deno run --env-file=.env --no-prompt \
-  --allow-env=FANTASY_TOKEN,FANTASY_API_URL \
-  --allow-net=fantasy.poneeey.fr:443 src/cli.ts player 825 --detailed --json
+deno task cli player 825 --detailed --json
 ```
 
 The default task grants access only to the two environment variables and
