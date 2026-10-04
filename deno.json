@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "cli": "deno run --no-prompt --allow-env=FANTASY_TOKEN,FANTASY_API_URL --allow-net=fantasy.poneeey.fr:443 src/cli.ts",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "check": "deno fmt --check && deno lint && deno check src/*.ts tests/*.ts",
+    "test": "deno test"
+  }
+}
