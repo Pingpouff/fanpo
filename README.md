@@ -224,15 +224,61 @@ tests. Tests run without runtime permissions or production API access; they use
 fake fetch responses to exercise the client and CLI. Test fixtures are
 synthetic, not a captured production payload.
 
-`src/cli.ts` defines commands and handles terminal I/O. `src/cli_output.ts`
-contains the pure output functions for tables and quick/detailed views. The API
-client is independent of Cliffy. `runCli()` returns output without printing or
-exiting, which keeps help, validation and command execution testable.
+### Source layout
 
-The API models follow the supplied response example. Additional API fields are
-allowed and preserved, but the known fields are trusted rather than validated at
-runtime. Production schema compatibility has not been verified with a live
-token.
+Code is grouped by API feature:
+
+```text
+src/
+  api/
+    client.ts                 # Public FantasyClient facade
+    http.ts                   # Shared authenticated HTTP transport
+    shared/                   # Shared round model and ID validation
+    joueurs/
+      request.ts              # /api/joueurs
+      types.ts
+      fiche/                  # /api/joueurs/:id/fiche
+        request.ts
+        types.ts
+    composition/              # /api/compos/:id
+      request.ts
+      types.ts
+      journee/                # /api/compos/:id/journee/:round
+        request.ts
+        types.ts
+  cli/
+    shared/                   # Cliffy setup and terminal table formatting
+    joueurs/
+      command.ts
+      filters.ts
+      output.ts
+      fiche/
+        command.ts
+        output.ts
+    composition/
+      command.ts
+      output.ts
+      journee/
+        output.ts
+  cli.ts                      # CLI assembly and terminal I/O
+  config.ts                   # Environment configuration
+  client.ts                   # Compatibility re-export
+  types.ts                    # Public model re-exports
+  filters.ts                  # Compatibility re-export
+```
+
+Both API and CLI folders are grouped by feature. API modules own requests and
+models and return the parsed API response without filtering or formatting. CLI
+modules own command parsing, local filtering and output rendering. The
+composition folder uses the feature name; its HTTP routes remain `/api/compos`.
+The public client stays independent of Cliffy and terminal output. Existing
+imports from `src/client.ts`, `src/types.ts` and `src/filters.ts` remain
+supported. `runCli()` returns output without printing or exiting.
+
+Models preserve additional API fields and trust known fields without runtime
+validation. Current composition field names follow an inspected response sample;
+fixtures contain synthetic data. Player sheet and historical composition models
+follow the supplied examples.
 
 For sheets, measurements and secondary/tertiary positions can be null.
 Performance scores, minutes, starter status, played position, opponent, result,
