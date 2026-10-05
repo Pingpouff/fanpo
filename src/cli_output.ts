@@ -1,8 +1,50 @@
-import type { Player, PlayerSheetResponse, PlayersResponse } from "./types.ts";
+import type {
+  CompositionResponse,
+  HistoricalCompositionResponse,
+  Player,
+  PlayerSheetResponse,
+  PlayersResponse,
+} from "./types.ts";
 
 export interface OutputOptions {
   json?: boolean;
   detailed?: boolean;
+}
+
+export function renderComposition(
+  response: CompositionResponse,
+  options: OutputOptions = {},
+): string {
+  if (options.json || options.detailed) {
+    return JSON.stringify(response, null, 2);
+  }
+  const { compo, journee } = response;
+  const slots = !compo || compo.slots.length === 0 ? "No slots." : renderTable([
+    ["#", "Player", "Club", "Paid", "Min", "Score", "Points", ""],
+    ...compo.slots.map((slot) => [
+      String(slot.slot),
+      `${slot.prenom} ${slot.nom}`,
+      slot.club,
+      slot.prix_paye,
+      "-",
+      "-",
+      "-",
+      [
+        slot.slot === compo.capitaine_slot ? "[C]" : "",
+        slot.slot === compo.impact_slot ? "[I]" : "",
+      ].filter(Boolean).join(" "),
+    ]),
+  ]);
+  return [
+    `Round ${journee.numero}`,
+    `Deadline: ${journee.deadline_at}`,
+    `Status: ${compo?.statut ?? "-"}`,
+    "Total points: -",
+    `Team: ${response.equipe.nom}`,
+    `Budget: ${response.equipe.budget} / Cap: ${response.cap}`,
+    "",
+    slots,
+  ].join("\n");
 }
 
 export function renderPlayers(
@@ -26,6 +68,47 @@ export function renderPlayerSheet(
     );
   }
   return options.detailed ? sheetDetails(sheet) : sheetSummary(sheet);
+}
+
+export function renderHistoricalComposition(
+  response: HistoricalCompositionResponse,
+  options: OutputOptions = {},
+): string {
+  if (options.json || options.detailed) {
+    return JSON.stringify(response, null, 2);
+  }
+  const { compo } = response;
+  const slots = compo.slots.length === 0 ? "No slots." : renderTable([
+    ["#", "Player", "Club", "Paid", "Min", "Score", "Points", ""],
+    ...compo.slots.map((slot) => {
+      const markers = [
+        slot.slot === compo.capitaine_slot
+          ? compo.capitaine_auto ? "[C-auto]" : "[C]"
+          : "",
+        slot.slot === compo.impact_slot ? "[I]" : "",
+        slot.titulaire === false ? "SUB" : "",
+        slot.forfait ? "FORFAIT" : "",
+      ].filter(Boolean).join(" ");
+      return [
+        String(slot.slot),
+        `${slot.jprenom} ${slot.jnom}`,
+        slot.jclub,
+        slot.prix_paye,
+        String(slot.minutes ?? "-"),
+        slot.note?.toFixed(2) ?? "-",
+        slot.points?.toFixed(2) ?? "-",
+        markers,
+      ];
+    }),
+  ]);
+  return [
+    `Round ${response.journee}`,
+    `Deadline: ${response.deadline_at}`,
+    `Status: ${compo.statut}`,
+    `Total points: ${compo.points ?? "-"}`,
+    "",
+    slots,
+  ].join("\n");
 }
 
 function table(players: Player[]): string {

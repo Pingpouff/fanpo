@@ -1,6 +1,11 @@
 import { Command, ValidationError } from "@cliffy/command";
 import { FantasyClient } from "./client.ts";
-import { renderPlayers, renderPlayerSheet } from "./cli_output.ts";
+import {
+  renderComposition,
+  renderHistoricalComposition,
+  renderPlayers,
+  renderPlayerSheet,
+} from "./cli_output.ts";
 import { loadConfig } from "./config.ts";
 import { filterPlayers } from "./filters.ts";
 
@@ -14,7 +19,7 @@ export async function runCli(
   const command = new Command()
     .name("deno task cli")
     .description(
-      "Inspect Fantasy Rugby players. Requires FANTASY_TOKEN for API requests.",
+      "Inspect Fantasy Rugby players and compositions. Requires FANTASY_TOKEN for API requests.",
     )
     .noExit()
     .helpOption("-h, --help", "Show this help.", function () {
@@ -38,6 +43,15 @@ export async function runCli(
         throw new ValidationError(`--${name} requires a nonblank value.`);
       }
       return trimmed;
+    })
+    .globalType("positiveInteger", ({ value, name }) => {
+      const number = Number(value);
+      if (
+        !/^\d+$/.test(value) || !Number.isSafeInteger(number) || number <= 0
+      ) {
+        throw new ValidationError(`${name} must be a positive safe integer.`);
+      }
+      return number;
     })
     .command(
       "players",
@@ -71,6 +85,28 @@ export async function runCli(
     .action(async (options, id) => {
       const sheet = await getClient().getPlayerSheet(id);
       output = renderPlayerSheet(sheet, options);
+    })
+    .command(
+      "composition [id:positiveInteger]",
+      "Show the current composition (ID defaults to 1), or a specific round with --round.",
+    )
+    .option(
+      "--round <round:positiveInteger>",
+      "Historical Fantasy round; omit for the current composition.",
+    )
+    .option("--json", "Output the complete API response as JSON.")
+    .option("--detailed", "Display the complete raw API response.")
+    .action(async (options, id = 1) => {
+      if (options.round === undefined) {
+        const composition = await getClient().getComposition(id);
+        output = renderComposition(composition, options);
+        return;
+      }
+      const composition = await getClient().getCompositionForRound(
+        id,
+        options.round,
+      );
+      output = renderHistoricalComposition(composition, options);
     });
 
   await command.parse([...args]);

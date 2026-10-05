@@ -1,8 +1,8 @@
 # Fantasy Rugby connector
 
 A small Deno/TypeScript client for the API at <https://fantasy.poneeey.fr>, with
-a CLI for inspecting players and their detailed sheets, with Cliffy for argument
-parsing and generated help. No build step.
+a CLI for inspecting players, detailed sheets and historical compositions, with
+Cliffy for argument parsing and generated help. No build step.
 
 ## Setup
 
@@ -49,6 +49,7 @@ resolve from the origin: `getPlayers()` always requests `/api/joueurs`.
 deno task cli --help
 deno task cli players --help
 deno task cli player --help
+deno task cli composition --help
 deno task cli players
 deno task cli players --json
 deno task cli players --json | jq '.joueurs[]'
@@ -61,6 +62,13 @@ deno task cli player 825
 deno task cli player 825 --json
 deno task cli player 825 --detailed
 deno task cli player 825 --detailed --json | jq '.perfs[].stats.tackles'
+deno task cli composition
+deno task cli composition --json
+deno task cli composition --detailed
+deno task cli composition --round 4
+deno task cli composition --round 4 --detailed
+deno task cli composition --round 4 --json | jq '.compo.slots'
+deno task cli composition --round 4 --json | jq '.compo.points'
 ```
 
 Club codes match exactly, ignoring case. Position codes match the primary,
@@ -105,6 +113,45 @@ deno run --no-prompt --allow-env=FANTASY_TOKEN,FANTASY_API_URL \
   --allow-net=localhost:8000 src/cli.ts players --json
 ```
 
+### Compositions
+
+`composition` defaults to resource ID `1`. Without `--round`, it retrieves the
+current composition from `/api/compos/1`. With `--round 4`, it retrieves
+`/api/compos/1/journee/4`. An explicit ID is also supported, for example
+`composition 2` or `composition 2 --round 4`. IDs and round numbers must be
+positive safe integers. The resource ID is passed through without assigning it a
+team, manager or other meaning.
+
+Current compositions use the same compact table as historical rounds, with
+round, deadline, status, player names, clubs, paid prices and captain/impact
+markers. The summary also shows team, budget and cap. The current endpoint does
+not return match minutes, scores or resulting points; these columns and the
+total display `-`.
+
+`--detailed` or `--json` displays the complete raw JSON response for either
+current or historical compositions, including selection and lock metadata.
+
+Historical human output shows the round, deadline, status, API total and each
+selected player's club, paid price, minutes, note and resulting points. `[C]`
+marks the captain; `[C-auto]` marks an automatic captain; `[I]` marks the impact
+player. `SUB` means `titulaire === false` in the actual rugby match, and
+`FORFAIT` means the API returned `forfait: true`. Null performance values
+display as `-`.
+
+JSON output preserves the complete response and every slot, including
+`delta_valeur`, `titulaire`, `minutes`, `forfait`, and additional API fields.
+For example, select the captain using the returned slot number:
+
+```bash
+deno task cli composition --round 4 --json \
+  | jq '.compo as $c | $c.slots[] | select(.slot == $c.capitaine_slot)'
+```
+
+Historical results have a dedicated response type. They contain actual round
+outcomes; current compositions describe selection, budget, lock and kickoff
+metadata. These schemas are not interchangeable. The connector never computes
+captain/impact multipliers, forfait scoring, or player values from value deltas.
+
 ## Client
 
 The client takes configuration explicitly; it does not read environment
@@ -120,6 +167,12 @@ console.log(response.joueurs.length);
 
 const sheet = await client.getPlayerSheet(825);
 console.log(sheet.perfs[0]?.stats.tackles);
+
+const composition = await client.getCompositionForRound(1, 4);
+console.log(composition.compo.points);
+
+const currentComposition = await client.getComposition(1);
+console.log(currentComposition);
 ```
 
 Public connector API:
@@ -131,6 +184,13 @@ Public connector API:
 - `client.getPlayerSheet(playerId): Promise<PlayerSheetResponse>`: authenticated
   `GET /api/joueurs/<id>/fiche` using the same HTTP handling. Invalid IDs throw
   before requesting the API.
+- `client.getCompositionForRound(id, round): Promise<HistoricalCompositionResponse>`:
+  authenticated `GET /api/compos/<id>/journee/<round>` using the shared HTTP
+  handler. Invalid IDs or round numbers throw before requesting the API.
+- `client.getComposition(id): Promise<CompositionResponse>`: authenticated
+  `GET /api/compos/<id>` using the shared HTTP handler. `CompositionResponse`,
+  `CurrentComposition` and `CurrentCompositionSlot` model observed current
+  selection fields while preserving additional fields.
 - `FantasyHttpError`: non-2xx failures include the numeric `status` and
   endpoint. Response bodies are omitted from error messages.
 - `loadConfig()`: reads `FANTASY_TOKEN` and `FANTASY_API_URL`; returns
@@ -141,6 +201,10 @@ Public connector API:
   `PlayerSelection`, `PlayerAggregateStats`: sheet interfaces in `src/types.ts`.
   `PlayerMatchStats` is `Record<string, number>` so stat keys can evolve without
   enumerating them in the connector.
+- `HistoricalCompositionResponse`, `HistoricalComposition`,
+  `HistoricalCompositionSlot`: interfaces for round outcomes. Total points and
+  paid prices retain their API string representation; per-slot points and notes
+  retain their numeric representation, with null allowed for incomplete data.
 - `filterPlayers(players, filters?)`: optional, nonmutating local filters.
 
 Network and malformed JSON failures have contextual errors. Redirects are
@@ -178,3 +242,9 @@ no matches have been played. These nullability choices are assumptions; fixtures
 follow the supplied example rather than a captured live sheet. Selection and
 aggregate objects are assumed to be present, and detailed match stat values are
 assumed to be numeric.
+
+Historical composition types follow the supplied example, including null captain
+and impact slots and nullable performance fields. Known fields are assumed to be
+present, with null used for missing performance data. The client preserves the
+API's slot order and does not enforce a fixed slot count. Tests use a synthetic
+17-slot fixture and do not contact production.

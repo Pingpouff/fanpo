@@ -1,4 +1,9 @@
-import type { PlayerSheetResponse, PlayersResponse } from "./types.ts";
+import type {
+  CompositionResponse,
+  HistoricalCompositionResponse,
+  PlayerSheetResponse,
+  PlayersResponse,
+} from "./types.ts";
 
 export interface FantasyClientOptions {
   baseUrl: string;
@@ -52,6 +57,32 @@ export class FantasyClient {
       throw new Error("Fantasy API player ID must be a positive safe integer.");
     }
     return this.#get<PlayerSheetResponse>(`/api/joueurs/${playerId}/fiche`);
+  }
+
+  getComposition(id: number): Promise<CompositionResponse> {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error(
+        "Fantasy API composition ID must be a positive safe integer.",
+      );
+    }
+    return this.#get<CompositionResponse>(`/api/compos/${id}`);
+  }
+
+  getCompositionForRound(
+    id: number,
+    round: number,
+  ): Promise<HistoricalCompositionResponse> {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error(
+        "Fantasy API composition ID must be a positive safe integer.",
+      );
+    }
+    if (!Number.isSafeInteger(round) || round <= 0) {
+      throw new Error("Fantasy API round must be a positive safe integer.");
+    }
+    return this.#get<HistoricalCompositionResponse>(
+      `/api/compos/${id}/journee/${round}`,
+    );
   }
 
   async #get<T>(path: string): Promise<T> {
