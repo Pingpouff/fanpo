@@ -1,6 +1,7 @@
 import type { RequestMetadata } from "../../api/http.ts";
 import type { DataAccessMetadata } from "../../operations/metadata.ts";
 import { renderTable } from "./output.ts";
+import { heading, status, tone } from "./colors.ts";
 export interface CommandRequestMetadata extends RequestMetadata {
   storage: DataAccessMetadata["storage"];
   storedBytes: number;
@@ -30,7 +31,7 @@ function storage(value: DataAccessMetadata["storage"] | undefined) {
 }
 export function renderMetadata(value: CommandMetadata): string {
   const lines = [
-    "Request metadata",
+    heading("Request metadata"),
     `Started: ${value.startedAt} | Command time: ${
       value.durationMs.toFixed(2)
     } ms`,
@@ -59,12 +60,15 @@ export function renderMetadata(value: CommandMetadata): string {
             r.endpoint,
             r.startedAt,
             `${r.durationMs.toFixed(2)} ms`,
-            r.status === null ? "-" : String(r.status),
-            bytes(r.responseBytes),
-            r.outcome,
-            storage(
-              value.dataAccess.find((d) => d.endpoint === r.endpoint)?.storage,
+            r.status === null ? tone("-", "muted") : tone(
+              String(r.status),
+              r.status >= 400 ? "bad" : r.status >= 300 ? "caution" : "good",
             ),
+            bytes(r.responseBytes),
+            status(r.outcome),
+            status(storage(
+              value.dataAccess.find((d) => d.endpoint === r.endpoint)?.storage,
+            )),
           ],
         ),
       ]),
@@ -72,7 +76,7 @@ export function renderMetadata(value: CommandMetadata): string {
   }
   if (value.dataAccess.length) {
     lines.push(
-      "Data access:",
+      heading("Data access:"),
       renderTable([
         [
           "Endpoint",
@@ -87,11 +91,11 @@ export function renderMetadata(value: CommandMetadata): string {
         ...value.dataAccess.map(
           (d) => [
             d.endpoint,
-            d.source,
-            d.cacheStatus,
+            status(d.source),
+            status(d.cacheStatus),
             d.snapshotId === undefined ? "-" : `#${d.snapshotId}`,
             d.fetchedAt ?? "-",
-            storage(d.storage),
+            status(storage(d.storage)),
             bytes(d.storedBytes),
             bytes(d.cacheBytes),
           ],

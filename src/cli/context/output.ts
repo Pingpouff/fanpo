@@ -1,5 +1,13 @@
+import {
+  colorRating,
+  heading,
+  signed,
+  status,
+  tone,
+} from "../shared/colors.ts";
 import { renderTable } from "../shared/output.ts";
 import type { Matchday } from "../../api/shared/types.ts";
+import type { Player } from "../../api/joueurs/types.ts";
 import type {
   LocksResponse,
   RoundNotesResponse,
@@ -12,18 +20,23 @@ import type { forecastMatchups } from "../../analysis/matchups.ts";
 const number = (value: number | null | undefined, digits = 2) =>
   value == null ? "Unresolved" : value.toFixed(digits);
 const percent = (value: number | null | undefined) =>
-  value == null ? "Unresolved" : `${(100 * value).toFixed(1)}%`;
+  value == null ? tone("Unresolved", "muted") : `${(100 * value).toFixed(1)}%`;
 const money = (units: number) => `${(units / 1_000_000).toFixed(2)} M`;
 const role = (
   value: string,
-) => ({
-  starter: "Starter",
-  substitute: "Substitute",
-  unknown: "Unknown",
-  absent: "Absent",
-}[value] ?? value);
+) =>
+  status(
+    {
+      starter: "Starter",
+      substitute: "Substitute",
+      unknown: "Unknown",
+      absent: "Absent",
+    }[value] ?? value,
+  );
 const warnings = (items: readonly string[] | undefined, prefix = "Warning") =>
-  [...new Set(items ?? [])].map((w) => `${prefix}: ${w}`);
+  [...new Set(items ?? [])].map((w) =>
+    `${tone(prefix + ":", prefix === "Error" ? "bad" : "caution")} ${w}`
+  );
 
 interface Envelope {
   round: number;
@@ -84,9 +97,9 @@ interface PlayerView {
 function lineup(value: LineupView, labels?: Map<number, string>): string[] {
   const v = value.validation;
   return [
-    `Validation: ${v.status}`,
+    `Validation: ${status(v.status)}`,
     `Salary cap: ${money(v.budget)} | Cost: ${money(v.cost)} | Remaining: ${
-      money(v.remaining)
+      signed(v.remaining, money(v.remaining))
     }`,
     `Expected points: ${number(value.expected)}`,
     `Conditional total if all players start: ${
@@ -134,7 +147,9 @@ export function renderAnalysis(
   if (kind === "status") {
     const value = input as StatusView;
     return [
-      `Stored data | Season ${value.scope.season} | Profile ${value.scope.profile}`,
+      heading(
+        `Stored data | Season ${value.scope.season} | Profile ${value.scope.profile}`,
+      ),
       `API: ${value.scope.origin}`,
       `Round: ${value.round || "Unknown"}`,
       value.snapshots.length
@@ -145,19 +160,19 @@ export function renderAnalysis(
               s.endpoint,
               `#${s.id}`,
               s.fetchedAt,
-              s.stale ? "Stale" : "Fresh",
+              status(s.stale ? "Stale" : "Fresh"),
             ],
           ),
         ])
-        : "No stored data. Run sync online.",
+        : tone("No stored data. Run sync online.", "muted"),
     ].join("\n");
   }
   const value = input as Envelope;
   const lines = [
-    `Round ${value.round} | Model ${value.model.version}`,
+    heading(`Round ${value.round} | Model ${value.model.version}`),
     value.fullyCurrent
-      ? "Requested data is current."
-      : "Data is incomplete or stale.",
+      ? tone("Requested data is current.", "good")
+      : tone("Data is incomplete or stale.", "caution"),
     ...warnings(value.warnings),
     "",
   ];
@@ -173,9 +188,11 @@ export function renderAnalysis(
   if (kind === "player") {
     for (const p of value.result as PlayerView[]) {
       lines.push(
-        `${p.name ?? `Player ${p.playerId}`} (#${p.playerId})${
-          p.club ? ` | ${p.club}` : ""
-        }${p.price ? ` | ${p.price} M` : ""}`,
+        heading(
+          `${p.name ?? `Player ${p.playerId}`} (#${p.playerId})${
+            p.club ? ` | ${p.club}` : ""
+          }${p.price ? ` | ${p.price} M` : ""}`,
+        ),
         `Real role: ${role(p.status)}${
           p.withdrawal ? " | Official withdrawal credit: 30 points" : ""
         }`,
@@ -205,9 +222,12 @@ export function renderAnalysis(
               const s = p.scenarios![r];
               return [
                 role(r),
-                number(s.baseline),
+                colorRating(s.baseline, number(s.baseline)),
                 percent(s.scoringProbability),
-                `x${number(s.matchupFactor, 3)}`,
+                signed(
+                  s.matchupFactor == null ? null : s.matchupFactor - 1,
+                  `x${number(s.matchupFactor, 3)}`,
+                ),
                 number(s.expected),
               ];
             }),
@@ -217,14 +237,18 @@ export function renderAnalysis(
           const evidence = p.scenarios[r].evidence;
           if (evidence.length) {
             lines.push(
-              `${role(r)} history (newest first):`,
+              heading(
+                `${
+                  r === "starter" ? "Starter" : "Substitute"
+                } history (newest first):`,
+              ),
               renderTable([
                 ["Round", "Minutes", "Rating", "Weight"],
                 ...evidence.map(
                   (e) => [
                     String(e.round),
                     String(e.minutes),
-                    number(e.score),
+                    colorRating(e.score, number(e.score)),
                     number(e.weight, 3),
                   ],
                 ),
@@ -265,17 +289,17 @@ export function renderAnalysis(
               m.home,
               m.away,
               m.date,
-              number(m.expectedMargin),
+              signed(m.expectedMargin, number(m.expectedMargin)),
               percent(m.winProbability),
               percent(m.drawProbability),
               percent(m.lossProbability),
               percent(m.overwhelmProbability),
               percent(m.overwhelmedProbability),
-              number(m.domination, 3),
+              signed(m.domination, number(m.domination, 3)),
             ],
           ),
         ])
-        : "No fixtures available.",
+        : tone("No fixtures available.", "muted"),
       ...result.matches.flatMap((m) =>
         warnings(m.warnings, `${m.home} vs ${m.away}`)
       ),
@@ -293,15 +317,21 @@ export function renderAnalysis(
       changes: { slot: number; playerId: number }[];
     };
     lines.push(
-      `Expected points change: ${number(result.expectedDelta)}`,
-      `Cost change: ${result.costDelta > 0 ? "+" : ""}${
-        money(result.costDelta)
+      `Expected points change: ${
+        signed(result.expectedDelta, number(result.expectedDelta))
+      }`,
+      `Cost change: ${
+        signed(
+          result.costDelta,
+          `${result.costDelta > 0 ? "+" : ""}${money(result.costDelta)}`,
+          true,
+        )
       }`,
       "",
-      "Before",
+      heading("Before"),
       ...lineup(result.before, labels),
       "",
-      "After",
+      heading("After"),
       ...lineup(result.after, labels),
       "",
       result.changes.length
@@ -313,13 +343,13 @@ export function renderAnalysis(
             ) => [String(s.slot), labels?.get(s.playerId) ?? `#${s.playerId}`],
           ),
         ])
-        : "No player changes.",
+        : tone("No player changes.", "muted"),
     );
   }
   if (value.evidence.length) {
     lines.push(
       "",
-      `Evidence: ${value.evidence.length} stored sources`,
+      heading(`Evidence: ${value.evidence.length} stored sources`),
       ...value.evidence.map((e) =>
         `  ${e.endpoint} — snapshot #${e.id}, fetched ${e.fetchedAt}`
       ),
@@ -329,35 +359,44 @@ export function renderAnalysis(
 }
 export function renderRound(value: Matchday): string {
   return [
-    `Round ${value.numero} | ${value.type}`,
-    `Status: ${value.statut}`,
+    heading(`Round ${value.numero} | ${value.type}`),
+    `Status: ${status(value.statut)}`,
     `Deadline: ${value.deadline_at}`,
     `Deadline passed: ${
       value.deadline_passee === undefined
-        ? "Unknown"
+        ? tone("Unknown", "muted")
         : value.deadline_passee
-        ? "Yes"
-        : "No"
+        ? tone("Yes", "bad")
+        : tone("No", "good")
     }`,
     `Scored: ${
-      value.notee === undefined ? "Unknown" : value.notee ? "Yes" : "No"
+      value.notee === undefined
+        ? tone("Unknown", "muted")
+        : value.notee
+        ? tone("Yes", "good")
+        : tone("No", "caution")
     }`,
   ].join("\n");
 }
 export function renderTeamsheets(value: TeamsheetsResponse): string {
   return [
-    `Round ${value.journee}`,
+    heading(`Round ${value.journee}`),
     `Announced clubs: ${value.clubs_annonces.join(", ") || "None"}`,
-    `Provisional ratings: ${value.notes_provisoires ? "Yes" : "No"}`,
+    `Provisional ratings: ${
+      tone(
+        value.notes_provisoires ? "Yes" : "No",
+        value.notes_provisoires ? "caution" : "good",
+      )
+    }`,
     "Unannounced clubs have unknown roles.",
     Object.keys(value.joueurs).length
       ? renderTable([
         ["Player ID", "Shirt", "Real role"],
         ...Object.entries(value.joueurs).map((
           [id, shirt],
-        ) => [id, String(shirt), shirt <= 15 ? "Starter" : "Substitute"]),
+        ) => [id, String(shirt), role(shirt <= 15 ? "starter" : "substitute")]),
       ])
-      : "No announced players.",
+      : tone("No announced players.", "muted"),
   ].join("\n");
 }
 export function renderLocks(value: LocksResponse): string {
@@ -366,8 +405,10 @@ export function renderLocks(value: LocksResponse): string {
     ...new Set([...Object.keys(v.coups_envoi), ...v.demarres, ...v.liberes]),
   ];
   return [
-    `Round ${value.journee.numero}`,
-    `Matches in progress: ${v.en_cours ? "Yes" : "No"}`,
+    heading(`Round ${value.journee.numero}`),
+    `Matches in progress: ${
+      tone(v.en_cours ? "Yes" : "No", v.en_cours ? "caution" : "muted")
+    }`,
     `Next kickoff: ${v.prochain ?? "None"}`,
     clubs.length
       ? renderTable([
@@ -376,30 +417,37 @@ export function renderLocks(value: LocksResponse): string {
           (c) => [
             c,
             v.coups_envoi[c] ?? "Unknown",
-            v.liberes.includes(c)
-              ? "Released"
-              : v.demarres.includes(c)
-              ? "Locked"
-              : "Not started",
+            status(
+              v.liberes.includes(c)
+                ? "Released"
+                : v.demarres.includes(c)
+                ? "Locked"
+                : "Not started",
+            ),
           ],
         ),
       ])
-      : "No club locks reported.",
+      : tone("No club locks reported.", "muted"),
   ].join("\n");
 }
 export function renderRatings(
   value: RoundNotesResponse,
   round: number,
+  players: readonly Player[] = [],
 ): string {
+  const byId = new Map(players.map((p) => [String(p.id), p]));
   const ids = [
     ...new Set([...Object.keys(value.notes), ...value.forfaits.map(String)]),
   ];
   return [
-    `Round ${round} | Official ratings`,
+    heading(`Round ${round} | Official ratings`),
     ids.length
       ? renderTable([
         [
           "Player ID",
+          "Name",
+          "Position",
+          "Club",
           "Rating",
           "Minutes",
           "Real role",
@@ -408,22 +456,33 @@ export function renderRatings(
         ],
         ...ids.map((id) => {
           const n = value.notes[id];
+          const p = byId.get(id);
           return [
             id,
-            number(n?.note),
+            p ? `${p.prenom} ${p.nom}` : "Unknown",
+            p
+              ? [p.poste, p.poste_secondaire, p.poste_tertiaire].filter(Boolean)
+                .join(" / ")
+              : "Unknown",
+            p?.club ?? "Unknown",
+            colorRating(n?.note, number(n?.note)),
             n?.minutes == null ? "Unknown" : String(n.minutes),
-            n?.titulaire == null
-              ? "Unknown"
-              : n.titulaire
-              ? "Starter"
-              : "Substitute",
-            n ? n.verifiee ? "Yes" : "No" : "Unknown",
+            role(
+              n?.titulaire == null
+                ? "unknown"
+                : n.titulaire
+                ? "starter"
+                : "substitute",
+            ),
+            n
+              ? tone(n.verifiee ? "Yes" : "No", n.verifiee ? "good" : "caution")
+              : tone("Unknown", "muted"),
             value.forfaits.includes(Number(id))
-              ? "30 points before multipliers"
+              ? tone("30 points before multipliers", "caution")
               : "-",
           ];
         }),
       ])
-      : "No ratings or designated withdrawals.",
+      : tone("No ratings or designated withdrawals.", "muted"),
   ].join("\n");
 }

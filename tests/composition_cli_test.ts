@@ -1,3 +1,4 @@
+import { stripAnsi } from "../src/cli/shared/colors.ts";
 import { ValidationError } from "@cliffy/command";
 import { runCli } from "../src/cli.ts";
 import { FantasyClient, FantasyHttpError } from "../src/client.ts";
@@ -53,7 +54,7 @@ Deno.test("composition CLI displays API totals, captain, impact, real substitute
       "FORFAIT",
     ]
   ) {
-    assert(output.includes(text), `Missing ${text}`);
+    assert(stripAnsi(output).includes(text), `Missing ${text}`);
   }
   const captainLine = output.split("\n").find((line) =>
     line.includes("Chocobares")
@@ -70,8 +71,8 @@ Deno.test("composition CLI detailed view is human readable unless json is reques
     ["composition", "--round", "4", "--detailed"],
     client(),
   );
-  assert(output.includes("Total points:"));
-  assert(output.includes("Value change"));
+  assert(stripAnsi(output).includes("Total points:"));
+  assert(stripAnsi(output).includes("Value change"));
   assert(!output.includes("{"));
   equal(
     JSON.parse(
@@ -97,9 +98,9 @@ Deno.test("composition CLI handles manual captain and nullable performance data"
     ["composition", "1", "--round=4"],
     client(payload),
   );
-  assert(output.includes("[C]"));
+  assert(stripAnsi(output).includes("[C]"));
   assert(!output.includes("[C-auto]"));
-  assert(output.includes("Total points: -"));
+  assert(stripAnsi(output).includes("Total points: -"));
   const unknownLine = output.split("\n").find((line) =>
     line.includes("Player 4")
   );
@@ -120,7 +121,7 @@ Deno.test("composition CLI handles empty slots and absent captain and impact", a
       },
     }),
   );
-  assert(output.includes("No slots."));
+  assert(stripAnsi(output).includes("No slots."));
   assert(!output.includes("[C"));
   assert(!output.includes("[I]"));
 });
@@ -212,9 +213,9 @@ Deno.test("composition CLI propagates errors from the current endpoint", async (
 
 Deno.test("composition CLI help works without a token or network permissions", async () => {
   const output = await runCli(["composition", "--help"]);
-  assert(output.includes("--round"));
-  assert(output.includes("--json"));
-  assert(output.includes("--detailed"));
+  assert(stripAnsi(output).includes("--round"));
+  assert(stripAnsi(output).includes("--json"));
+  assert(stripAnsi(output).includes("--detailed"));
 });
 
 Deno.test("composition CLI propagates missing-composition HTTP errors", async () => {
@@ -254,7 +255,7 @@ Deno.test("current composition defaults to a compact table with unavailable outc
       "Points",
     ]
   ) {
-    assert(output.includes(text), `Missing ${text}`);
+    assert(stripAnsi(output).includes(text), `Missing ${text}`);
   }
   const rows = output.split("\n").filter((line) =>
     line.includes("Test Player")
@@ -262,7 +263,7 @@ Deno.test("current composition defaults to a compact table with unavailable outc
   equal(rows.length, 17);
   assert(rows[7].includes("[C]"));
   assert(rows[16].includes("[I]"));
-  assert(rows.every((row) => /0\.42\s+-\s+-\s+-/.test(row)));
+  assert(rows.every((row) => /0\.42\s+-\s+-\s+-/.test(stripAnsi(row))));
   assert(!output.includes("SUB"));
   assert(!output.includes("extra_response_field"));
 });
@@ -283,7 +284,7 @@ Deno.test("current composition handles empty or absent selections", async () => 
         Promise.resolve(Response.json({ ...currentComposition, compo })),
     });
     const output = await runCli(["composition"], currentClient);
-    assert(output.includes("No slots."));
+    assert(stripAnsi(output).includes("No slots."));
     assert(!output.includes("[C]"));
     assert(!output.includes("[I]"));
   }

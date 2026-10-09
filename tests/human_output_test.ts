@@ -1,3 +1,4 @@
+import { stripAnsi } from "../src/cli/shared/colors.ts";
 import { renderAnalysis } from "../src/cli/context/output.ts";
 import { runCli } from "../src/cli.ts";
 import { FantasyClient } from "../src/client.ts";
@@ -135,8 +136,9 @@ Deno.test("human sync, status, players, matchups and compare have command-specif
   ];
   for (const [kind, value, expected] of cases) {
     const text = renderAnalysis(kind, value);
+    assert(text.includes("\x1b[38;2;"), `${kind}: no foreground styling`);
     for (const part of expected) {
-      assert(text.includes(part), `${kind}: missing ${part}`);
+      assert(stripAnsi(text).includes(part), `${kind}: missing ${part}`);
     }
     assert(!text.includes("{"), kind);
   }
@@ -185,12 +187,17 @@ Deno.test("context defaults use readable lists and tables; json preserves the co
       baseUrl: "https://example.com",
       token: "test",
       fetch: (input) => {
+        if (new URL(String(input)).pathname === "/api/joueurs") {
+          return Promise.resolve(Response.json({ joueurs: [] }));
+        }
         assert(new URL(String(input)).pathname === endpoints[i]);
         return Promise.resolve(Response.json(payload));
       },
     });
     const args = name === "ratings" ? [name, "--round", "6"] : [name];
     const text = await runCli(args, client);
+    assert(text.includes("\x1b[38;2;"), `${name}: no foreground styling`);
+    assert(await runCli([...args, "--no-color"], client) === stripAnsi(text));
     assert(!text.includes("{"), `${name} emits JSON`);
     assert(
       JSON.stringify(JSON.parse(await runCli([...args, "--json"], client))) ===

@@ -1,3 +1,4 @@
+import { colorRating, heading, tone } from "../../shared/colors.ts";
 import type { PlayerSheetResponse } from "../../../api/joueurs/fiche/types.ts";
 import { type OutputOptions, renderTable } from "../../shared/output.ts";
 
@@ -40,19 +41,28 @@ export function renderPlayerSheets(
 function sheetDetails(sheet: PlayerSheetResponse): string {
   return [
     sheetSummary(sheet),
-    "Aggregate stats:",
+    heading("Aggregate stats:"),
     renderTable(
       Object.entries(sheet.stats).map((
         [key, value],
-      ) => [key, String(value ?? "-")]),
+      ) => [
+        key,
+        ["moyenne", "meilleure", "pire"].includes(key)
+          ? colorRating(value as number | null, String(value ?? "-"))
+          : String(value ?? "-"),
+      ]),
+      { header: false },
     ),
     ...sheet.perfs.map((perf) =>
-      `Round ${perf.numero} stats:\n` +
-      (Object.keys(perf.stats).length === 0 ? "No match stats." : renderTable(
-        Object.entries(perf.stats).map((
-          [key, value],
-        ) => [key, String(value)]),
-      ))
+      heading(`Round ${perf.numero} stats:`) + "\n" +
+      (Object.keys(perf.stats).length === 0
+        ? tone("No match stats.", "muted")
+        : renderTable(
+          Object.entries(perf.stats).map((
+            [key, value],
+          ) => [key, String(value)]),
+          { header: false },
+        ))
     ),
   ].join("\n\n");
 }
@@ -66,28 +76,31 @@ function sheetSummary(sheet: PlayerSheetResponse): string {
   ]
     .filter((position) => position != null).join(" / ");
   const performances = perfs.length === 0
-    ? "No performances yet."
+    ? tone("No performances yet.", "muted")
     : renderTable([
       ["Round", "Opp", "H/A", "Starter", "Min", "Score"],
       ...perfs.map((perf) => [
         String(perf.numero),
         perf.adversaire ?? "-",
         perf.domicile == null ? "-" : perf.domicile ? "Home" : "Away",
-        perf.titulaire == null ? "-" : perf.titulaire ? "yes" : "no",
+        perf.titulaire == null ? tone("-", "muted") : tone(
+          perf.titulaire ? "yes" : "no",
+          perf.titulaire ? "good" : "caution",
+        ),
         String(perf.minutes_jouees ?? "-"),
-        perf.note ?? "-",
+        colorRating(perf.note),
       ]),
     ]);
   return [
-    `${player.prenom} ${player.nom} — ${player.club_nom}`,
+    heading(`${player.prenom} ${player.nom} — ${player.club_nom}`),
     positions,
-    `Value: ${player.valeur}`,
+    `Value: ${tone(player.valeur)}`,
     "",
     performances,
     "",
-    `Average: ${stats.moyenne?.toFixed(2) ?? "-"}`,
-    `Best: ${stats.meilleure?.toFixed(2) ?? "-"}`,
-    `Worst: ${stats.pire?.toFixed(2) ?? "-"}`,
+    `Average: ${colorRating(stats.moyenne, stats.moyenne?.toFixed(2) ?? "-")}`,
+    `Best: ${colorRating(stats.meilleure, stats.meilleure?.toFixed(2) ?? "-")}`,
+    `Worst: ${colorRating(stats.pire, stats.pire?.toFixed(2) ?? "-")}`,
     `Tries: ${stats.essais}`,
   ].join("\n");
 }

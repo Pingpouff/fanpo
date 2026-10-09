@@ -1,3 +1,4 @@
+import { humanColors } from "./cli/shared/colors.ts";
 import { type CommandMetadata, renderMetadata } from "./cli/shared/metadata.ts";
 import type { RequestMetadata } from "./api/http.ts";
 import type { DataAccessMetadata } from "./operations/metadata.ts";
@@ -19,6 +20,7 @@ export async function runCli(
 ): Promise<string> {
   let output = "";
   let debug = false;
+  let noColor = false;
   const startedAt = new Date().toISOString(), started = performance.now();
   const requests: RequestMetadata[] = [], dataAccess: DataAccessMetadata[] = [];
   let unsubscribe: (() => void) | undefined;
@@ -48,6 +50,10 @@ export async function runCli(
   const command = root
     .name("deno task cli")
     .globalOption(
+      "--no-color",
+      "Disable ANSI colors in readable output.",
+    )
+    .globalOption(
       "--debug",
       "Request timings, bytes and storage; --json wraps results as {data,metadata}.",
       (value) => {
@@ -57,7 +63,7 @@ export async function runCli(
     )
     .description(
       "Inspect live Fantasy Rugby data, cache it and compare projected lineups.\n" +
-        "Readable tables by default; add --json to a command for structured output.\n" +
+        "Colored tables by default; use --no-color for plain text or --json for structured output.\n" +
         "Online requests need FANTASY_TOKEN (.env). Cached analysis also needs deno task sqlite:setup.\n" +
         "Run any command with --help for its options and examples.",
     )
@@ -85,7 +91,17 @@ export async function runCli(
   let metadata: CommandMetadata | undefined;
   let json = false;
   try {
-    const parsed = await command.parse([...args]);
+    // Cliffy treats --help as standalone. Consume this presentation-only flag
+    // first so --no-color --help remains usable without relaxing help validation.
+    const separator = args.indexOf("--");
+    const parseArgs = args.filter((arg, index) => {
+      if (arg === "--no-color" && (separator < 0 || index < separator)) {
+        noColor = true;
+        return false;
+      }
+      return true;
+    });
+    const parsed = await command.parse(parseArgs);
     json = !!parsed.options.json;
   } finally {
     unsubscribe?.();
@@ -124,9 +140,9 @@ export async function runCli(
   if (metadata) {
     return json
       ? JSON.stringify({ data: JSON.parse(output), metadata }, null, 2)
-      : `${output}\n\n${renderMetadata(metadata)}`;
+      : humanColors(`${output}\n\n${renderMetadata(metadata)}`, noColor);
   }
-  return output;
+  return json ? output : humanColors(output, noColor);
 }
 
 if (import.meta.main) {
@@ -145,8 +161,11 @@ if (import.meta.main) {
       metadata
         ? (Deno.args.some((arg) => arg === "--json" || arg === "--json=true")
           ? JSON.stringify({ error: message, metadata }, null, 2)
-          : `Error: ${message}\n\n${renderMetadata(metadata)}`)
-        : `Error: ${message}`,
+          : humanColors(
+            `Error: ${message}\n\n${renderMetadata(metadata)}`,
+            Deno.args.includes("--no-color"),
+          ))
+        : humanColors(`Error: ${message}`, Deno.args.includes("--no-color")),
     );
     Deno.exitCode = 1;
   }

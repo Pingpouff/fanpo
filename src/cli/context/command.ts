@@ -10,6 +10,7 @@ import {
   groupCommand,
 } from "../shared/command.ts";
 import { renderTable } from "../shared/output.ts";
+import { signed, status, tone } from "../shared/colors.ts";
 export function contextCommands(
   root: ReturnType<typeof createCommand>,
   context: CommandContext,
@@ -51,14 +52,14 @@ export function contextCommands(
                   ],
                   ...value.classement.map((s) =>
                     [
-                      s.position,
+                      tone(String(s.position)),
                       s.abrev,
                       s.joues,
                       s.points,
                       s.victoires,
                       s.nuls,
                       s.defaites,
-                      s.diff,
+                      signed(s.diff, String(s.diff)),
                     ].map(String)
                   ),
                 ],
@@ -92,8 +93,12 @@ export function contextCommands(
                     m.ext.abrev,
                     m.dom.score === null || m.ext.score === null
                       ? "-"
-                      : `${m.dom.score} - ${m.ext.score}`,
-                    m.statut,
+                      : `${
+                        signed(m.dom.score - m.ext.score, String(m.dom.score))
+                      } - ${
+                        signed(m.ext.score - m.dom.score, String(m.ext.score))
+                      }`,
+                    status(m.statut),
                   ],
                 ),
               ],
@@ -146,7 +151,7 @@ export function contextCommands(
   root.command(
     "ratings",
     createCommand().description(
-      "Show official player ratings, minutes, roles and withdrawal credits for a round.\nThe round is required. Withdrawal credit is 30 points before Fantasy multipliers.",
+      "Show player names, positions, clubs, official ratings, minutes, roles and withdrawal credits.\nThe round is required. Readable output joins the current player catalogue; --json returns raw ratings.\nWithdrawal credit is 30 points before Fantasy multipliers.",
     ).example("Round ratings", "deno task cli ratings --round 5")
       .option(
         "--round <round:positiveInteger>",
@@ -155,10 +160,14 @@ export function contextCommands(
       )
       .option("--json", "Complete API response as JSON.").action(async (o) => {
         const value = await context.getClient().getRoundNotes(o.round);
+        const players = !o.json &&
+            (Object.keys(value.notes).length || value.forfaits.length)
+          ? (await context.getClient().getPlayers()).joueurs
+          : [];
         context.setOutput(
           o.json
             ? JSON.stringify(value, null, 2)
-            : renderRatings(value, o.round),
+            : renderRatings(value, o.round, players),
         );
       }),
   );

@@ -82,7 +82,7 @@ copyable examples, e.g. `deno task cli analyze lineup --help`.
 | `round`                      | Target Fantasy round, deadline and scoring status   | —                                               |
 | `teamsheets`                 | Announced clubs and real starter/substitute roles   | —                                               |
 | `locks`                      | Server locks and club kickoff times                 | —                                               |
-| `ratings --round N`          | Official ratings, minutes and withdrawal credits    | `--round` is required                           |
+| `ratings --round N`          | Player names, positions, clubs and official ratings | `--round` is required                           |
 | `top14 standings`            | Current league ranking and points                   | —                                               |
 | `top14 matches`              | Season fixtures and results, home team first        | `--round N` filters one round                   |
 | `sync [ids...]`              | Cache squad/context plus optional candidate fiches  | `--force`, `--composition`                      |
@@ -92,10 +92,57 @@ copyable examples, e.g. `deno task cli analyze lineup --help`.
 | `analyze lineup`             | Team legality, budget and projected points          | `--lineup FILE`, `--composition`                |
 | `compare --alternative FILE` | Proposed vs current team, or two saved teams        | `--lineup FILE` supplies the before team        |
 
-All leaf commands support `--json`; all commands support `--debug` and `-h` /
-`--help`. Live inspection commands (`players`, `player`, `composition`, `round`,
-`teamsheets`, `locks`, `ratings`, `top14 ...`) request the API each time and
-require `FANTASY_TOKEN`. They do not populate the analysis cache.
+All leaf commands support `--json`; all commands support `--no-color`, `--debug`
+and `-h` / `--help`. Live inspection commands (`players`, `player`,
+`composition`, `round`, `teamsheets`, `locks`, `ratings`, `top14 ...`) request
+the API each time and require `FANTASY_TOKEN`. They do not populate the analysis
+cache.
+
+`ratings --round N` joins official ratings with the current player catalogue in
+readable output, including players with withdrawal credits. Names, positions and
+clubs reflect the current catalogue even for an earlier round. Players absent
+from the catalogue retain their ID and rating with `Unknown` details. This adds
+one catalogue request when results are nonempty; `--debug` reports both
+requests. `--json` preserves the raw ratings response without the catalogue
+request.
+
+### Output colors
+
+Readable output uses ANSI colors by default, including when redirected. Use
+`--no-color` for plain text. JSON output never contains color codes.
+
+```bash
+deno task cli player 825
+deno task cli player 825 --no-color
+deno task cli --no-color --help
+```
+
+Player ratings and averages use the same color map as the
+[Fantasy team display](https://fantasy.poneeey.fr/equipe):
+
+| Rating         | Color  | Hex       |
+| -------------- | ------ | --------- |
+| Below 50       | Red    | `#D9432F` |
+| 50 to below 70 | Orange | `#E08A2E` |
+| 70 to below 80 | Blue   | `#2E7CD9` |
+| 80 to below 90 | Green  | `#2F9E58` |
+| 90 and above   | Purple | `#8B4FD9` |
+| Missing        | Grey   | `#5a5f58` |
+
+Historical fantasy points use the underlying player rating's color before
+captain or impact multipliers. The same rating bands apply to detailed aggregate
+ratings, analysis baselines and historical player ratings. Team totals, match
+scores, probabilities and costs do not use the player rating bands.
+
+Across API, data and analysis commands, headings and table headers are bold
+cyan. Green indicates valid selections, starters, fresh data and successful
+requests; orange indicates provisional data, substitutes and cautions; red
+indicates invalid selections, locked clubs, withdrawals and errors. Missing data
+and empty results are grey. Captain and impact markers are cyan. Positive
+performance or budget changes are green and negative changes red; cost decreases
+are green. Match scores highlight the winner in green and loser in red. Debug
+output colors HTTP outcomes, cache freshness and storage status with the same
+conventions.
 
 ### Cached command options
 

@@ -1,4 +1,5 @@
 import type { CompositionResponse } from "../../api/composition/types.ts";
+import { colorRating, heading, status, tone } from "../shared/colors.ts";
 import { type OutputOptions, renderTable } from "../shared/output.ts";
 
 export function renderComposition(
@@ -9,37 +10,39 @@ export function renderComposition(
     return JSON.stringify(response, null, 2);
   }
   const { compo, journee } = response;
-  const slots = !compo || compo.slots.length === 0 ? "No slots." : renderTable([
-    [
-      "#",
-      "Player",
-      "Club",
-      "Paid",
-      "Min",
-      "Score",
-      "Points",
-      "",
-      ...(options.detailed ? ["Position"] : []),
-    ],
-    ...compo.slots.map((slot) => [
-      String(slot.slot),
-      `${slot.prenom} ${slot.nom}`,
-      slot.club,
-      slot.prix_paye,
-      "-",
-      "-",
-      "-",
+  const slots = !compo || compo.slots.length === 0
+    ? tone("No slots.", "muted")
+    : renderTable([
       [
-        slot.slot === compo.capitaine_slot ? "[C]" : "",
-        slot.slot === compo.impact_slot ? "[I]" : "",
-      ].filter(Boolean).join(" "),
-      ...(options.detailed ? [slot.poste] : []),
-    ]),
-  ]);
+        "#",
+        "Player",
+        "Club",
+        "Paid",
+        "Min",
+        "Score",
+        "Points",
+        "",
+        ...(options.detailed ? ["Position"] : []),
+      ],
+      ...compo.slots.map((slot) => [
+        String(slot.slot),
+        `${slot.prenom} ${slot.nom}`,
+        slot.club,
+        slot.prix_paye,
+        "-",
+        colorRating(null),
+        "-",
+        [
+          slot.slot === compo.capitaine_slot ? "[C]" : "",
+          slot.slot === compo.impact_slot ? "[I]" : "",
+        ].filter(Boolean).map((m) => tone(m)).join(" "),
+        ...(options.detailed ? [slot.poste] : []),
+      ]),
+    ]);
   return [
-    `Round ${journee.numero}`,
+    heading(`Round ${journee.numero}`),
     `Deadline: ${journee.deadline_at}`,
-    `Status: ${compo?.statut ?? "-"}`,
+    `Status: ${status(compo?.statut ?? "-")}`,
     "Total points: -",
     `Team: ${response.equipe.nom}`,
     `Budget: ${response.equipe.budget} (effective salary cap) / Cap: ${response.cap} (reference)`,

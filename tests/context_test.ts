@@ -1,6 +1,7 @@
 import { FantasyClient } from "../src/client.ts";
 import { runCli } from "../src/cli.ts";
-import { equal } from "./helpers.ts";
+import { assert, equal } from "./helpers.ts";
+import { player, response } from "./fixtures.ts";
 Deno.test("context endpoints preserve extra fields and filter fixture rounds locally", async () => {
   const seen: string[] = [];
   const client = new FantasyClient({
@@ -111,4 +112,56 @@ Deno.test("competition terminal output renders useful standing and fixture colum
     ).forfaits,
     [1],
   );
+});
+
+Deno.test("ratings output joins player info by ID, including withdrawals and unknown players", async () => {
+  const notes = {
+    notes: {
+      "1": { note: 76.97, minutes: 44, titulaire: false, verifiee: true },
+      "999": { note: null, minutes: null, titulaire: null, verifiee: false },
+    },
+    forfaits: [2],
+  };
+  const client = new FantasyClient({
+    baseUrl: "https://example.com",
+    token: "test",
+    fetch: (url) =>
+      Promise.resolve(Response.json(
+        url.pathname === "/api/joueurs"
+          ? {
+            ...response,
+            joueurs: [
+              player({
+                id: 2,
+                prenom: "Beka",
+                nom: "Gorgadze",
+                poste: "N8",
+                poste_secondaire: "TL",
+                club: "SP",
+              }),
+              player(),
+            ],
+          }
+          : notes,
+      )),
+  });
+  const output = await runCli(
+    ["ratings", "--round", "6", "--no-color"],
+    client,
+  );
+  const bamba = output.split("\n").find((line) => line.includes("Demba Bamba"));
+  assert(
+    bamba?.includes("PIL") && bamba.includes("UBB") && bamba.includes("76.97"),
+  );
+  const withdrawal = output.split("\n").find((line) =>
+    line.includes("Beka Gorgadze")
+  );
+  assert(
+    withdrawal?.includes("N8 / TL") && withdrawal.includes("SP") &&
+      withdrawal.includes("30 points"),
+  );
+  const missing = output.split("\n").find((line) =>
+    line.trimStart().startsWith("999 ")
+  );
+  assert(missing?.includes("Unknown"));
 });

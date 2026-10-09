@@ -1,3 +1,4 @@
+import { stripAnsi } from "../src/cli/shared/colors.ts";
 import { runCli } from "../src/cli.ts";
 import { ValidationError } from "@cliffy/command";
 import { FantasyClient } from "../src/client.ts";
@@ -45,7 +46,7 @@ Deno.test("CLI table displays players, values and unavailable status", async () 
       "no",
     ]
   ) {
-    assert(output.includes(text), `Missing ${text}`);
+    assert(stripAnsi(output).includes(text), `Missing ${text}`);
   }
 });
 
@@ -63,7 +64,7 @@ Deno.test("CLI applies name and position filters together", async () => {
 
 Deno.test("CLI handles empty results in both output modes", async () => {
   equal(
-    await runCli(["players", "--name", "unknown"], client()),
+    stripAnsi(await runCli(["players", "--name", "unknown"], client())),
     "No players found.",
   );
   const output = JSON.parse(
@@ -162,7 +163,7 @@ Deno.test("player detailed terminal view includes aggregate and each round's mat
         "12.5",
       ]
     ) {
-      assert(output.includes(text), `Missing ${text}`);
+      assert(stripAnsi(output).includes(text), `Missing ${text}`);
     }
   }
 });
@@ -197,7 +198,7 @@ Deno.test("player CLI displays a compact identity, performance and aggregate sum
       "Tries: 0",
     ]
   ) {
-    assert(output.includes(text), `Missing ${text}`);
+    assert(stripAnsi(output).includes(text), `Missing ${text}`);
   }
   assert(!output.includes("tackles"));
   assert(!output.includes("future_numeric_stat"));
@@ -222,8 +223,8 @@ Deno.test("player CLI handles no performances and nullable scores and positions"
   };
   const output = await runCli(["player", "825"], client(sheet));
   assert(output.includes("No performances yet."));
-  assert(output.includes("Average: -"));
-  assert(output.includes("Best: -"));
+  assert(stripAnsi(output).includes("Average: -"));
+  assert(stripAnsi(output).includes("Best: -"));
   assert(!output.includes("null"));
   assert(!output.includes("N8 /"));
 });
