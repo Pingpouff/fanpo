@@ -1,0 +1,15 @@
+{
+  "pack": "fantasy-rugby-skills-pack",
+  "version": "0.1",
+  "skills": [
+    "fantasy-rugby",
+    "auditing-fantasy-lineup",
+    "analyzing-fantasy-player",
+    "analyzing-rugby-matchups",
+    "optimizing-fantasy-lineup",
+    "selecting-fantasy-captain",
+    "selecting-impact-players",
+    "validating-fantasy-lineup"
+  ],
+  "source_of_truth": "regles_fantasy_rugby.md"
+}

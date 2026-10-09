@@ -264,10 +264,49 @@ Deno.test("player CLI rejects missing, malformed and unsafe IDs and unsupported 
     assert(error instanceof ValidationError);
   }
   for (
-    const args of [["player", "825", "--club", "SP"], ["player", "825", "826"]]
+    const args of [["player", "825", "--club", "SP"], ["player", "825", "bad"]]
   ) {
     const error = await rejects(() => runCli(args), "");
     assert(error instanceof ValidationError);
+  }
+});
+
+Deno.test("multi-player CLI preserves order and quick/detailed views", async () => {
+  const multiClient = new FantasyClient({
+    baseUrl: "https://example.test",
+    token: "test-token",
+    fetch: (url) => {
+      const id = Number(url.pathname.split("/")[3]);
+      return Promise.resolve(Response.json({
+        ...sheetResponse,
+        joueur: { ...sheetResponse.joueur, id, prenom: `Player${id}` },
+      }));
+    },
+  });
+  for (const flag of ["--detailed", "--stats"]) {
+    const sheets = JSON.parse(
+      await runCli(
+        ["player", "826", "825", flag, "--json"],
+        multiClient,
+      ),
+    );
+    equal(sheets.map((s: PlayerSheetResponse) => s.joueur.id), [826, 825]);
+    equal(sheets[0].stats, sheetResponse.stats);
+    equal(sheets[1].perfs, sheetResponse.perfs);
+  }
+  const quick = JSON.parse(
+    await runCli(["player", "826", "825", "--json"], multiClient),
+  );
+  assert(quick.every((s: Record<string, unknown>) => !("stats" in s)));
+  assert(
+    quick.every((s: PlayerSheetResponse) =>
+      s.perfs.every((p) => !("stats" in p))
+    ),
+  );
+  for (const flags of [[], ["--detailed"]]) {
+    const text = await runCli(["player", "826", "825", ...flags], multiClient);
+    assert(text.indexOf("Player826") < text.indexOf("Player825"));
+    equal(text.includes("Aggregate stats"), flags.length > 0);
   }
 });
 

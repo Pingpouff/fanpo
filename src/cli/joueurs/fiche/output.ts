@@ -23,6 +23,20 @@ function quickSheet(sheet: PlayerSheetResponse) {
   };
 }
 
+export function renderPlayerSheets(
+  sheets: readonly PlayerSheetResponse[],
+  options: OutputOptions = {},
+): string {
+  if (options.json) {
+    return JSON.stringify(
+      options.detailed ? sheets : sheets.map(quickSheet),
+      null,
+      2,
+    );
+  }
+  return sheets.map((sheet) => renderPlayerSheet(sheet, options)).join("\n\n");
+}
+
 function sheetDetails(sheet: PlayerSheetResponse): string {
   return [
     sheetSummary(sheet),

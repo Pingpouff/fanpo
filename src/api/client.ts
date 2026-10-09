@@ -1,6 +1,6 @@
 import { type FantasyClientOptions, FantasyHttpClient } from "./http.ts";
 import { getPlayers } from "./joueurs/request.ts";
-import { getPlayerSheet } from "./joueurs/fiche/request.ts";
+import { getPlayerSheet, getPlayerSheets } from "./joueurs/fiche/request.ts";
 import { getComposition } from "./composition/request.ts";
 import { getCompositionForRound } from "./composition/journee/request.ts";
 export { FantasyHttpError } from "./http.ts";
@@ -20,6 +20,10 @@ export class FantasyClient {
 
   getPlayerSheet(playerId: number) {
     return getPlayerSheet(this.#http, playerId);
+  }
+
+  getPlayerSheets(playerIds: readonly number[]) {
+    return getPlayerSheets(this.#http, playerIds);
   }
 
   getComposition(id: number) {

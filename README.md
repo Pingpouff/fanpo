@@ -62,6 +62,8 @@ deno task cli player 825
 deno task cli player 825 --json
 deno task cli player 825 --detailed
 deno task cli player 825 --detailed --json | jq '.perfs[].stats.tackles'
+deno task cli player 479 1133 1160
+deno task cli player 479 1133 1160 --detailed --json
 deno task cli composition
 deno task cli composition --json
 deno task cli composition --detailed
@@ -95,6 +97,19 @@ output adds aggregate and per-round stat fields; `--detailed --json` preserves
 the complete API response, including all detailed match stats and extra fields.
 The client always returns the complete sheet; these views affect only CLI
 output. The list filters apply only to `players`.
+
+`player <id> [ids...]` also accepts multiple player IDs. Each ID uses the
+existing `/api/joueurs/<id>/fiche` endpoint, with at most five concurrent
+requests. Results retain input order, including repeated IDs. Terminal output
+shows consecutive player sheets; JSON output is an array when multiple IDs are
+supplied and remains a single object for one ID. `--detailed` and `--stats`
+apply to every sheet; quick JSON omits aggregate and per-round stats from every
+sheet.
+
+All IDs are validated before any requests start. If a fiche request fails, the
+command exits with an error identifying its endpoint and produces no partial
+output. Already-running requests finish before the error is reported; further
+requests stop being scheduled after a failure is detected.
 
 The CLI task includes `.env` loading and the required permissions, so no extra
 flags are needed:
@@ -168,6 +183,9 @@ console.log(response.joueurs.length);
 const sheet = await client.getPlayerSheet(825);
 console.log(sheet.perfs[0]?.stats.tackles);
 
+const sheets = await client.getPlayerSheets([479, 1133, 1160]);
+console.log(sheets.map((sheet) => sheet.joueur));
+
 const composition = await client.getCompositionForRound(1, 4);
 console.log(composition.compo.points);
 
@@ -184,6 +202,11 @@ Public connector API:
 - `client.getPlayerSheet(playerId): Promise<PlayerSheetResponse>`: authenticated
   `GET /api/joueurs/<id>/fiche` using the same HTTP handling. Invalid IDs throw
   before requesting the API.
+- `client.getPlayerSheets(playerIds): Promise<PlayerSheetResponse[]>`: retrieves
+  full fiches with at most five concurrent requests, preserving input order and
+  duplicates. Validates the complete ID array before fetching; an empty array
+  returns an empty array without requests. A failed request rejects with the
+  existing endpoint-specific error after in-flight requests settle.
 - `client.getCompositionForRound(id, round): Promise<HistoricalCompositionResponse>`:
   authenticated `GET /api/compos/<id>/journee/<round>` using the shared HTTP
   handler. Invalid IDs or round numbers throw before requesting the API.
