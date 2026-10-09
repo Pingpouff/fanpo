@@ -11,15 +11,19 @@ Select impact players only from the set of players eligible under the project ru
 
 Eligibility is a hard prerequisite; expected upside is considered only after eligibility.
 
-## Hard prerequisite
+## Verify real role and scoring
 
-Confirm real-match substitute status using the available team sheet.
+The two Fantasy bench slots are legal for real starters and substitutes. Only
+one designated impact slot gets x2. Real starters on the Fantasy bench receive
+half their rating before the impact multiplier. Compare the penalized starter
+projection with the substitute projection; do not exclude starters as illegal.
 
-- Eligible substitute → continue analysis.
-- Confirmed starter → exclude from impact-player ranking.
-- Status unknown → mark eligibility `UNRESOLVED`.
+- Announced starter: apply the half-score penalty on the Fantasy bench.
+- Announced substitute: use substitute-role history and the probability of ten minutes.
+- Unannounced club: role is unknown; present conditional scenarios.
+- Announced club with player omitted: absent, unless official withdrawal credit applies.
 
-Do not infer real-match substitute status from the player's position in the Fantasy lineup.
+Do not infer real-match role from the Fantasy slot.
 
 ## Evaluation dimensions
 
@@ -44,12 +48,31 @@ For each serious candidate, separate:
 - Fantasy upside;
 - main risk.
 
-When two slots are required, ensure both selected players are individually eligible and mutually legal under all lineup constraints.
+Check both bench selections against budget and club constraints, then select exactly one impact multiplier.
 
 ## Common mistakes
 
-- Ranking a real-match starter as an impact player.
+- Calling a real starter on the Fantasy bench illegal instead of applying the half-score penalty.
 - Ignoring the minimum-minutes rule.
 - Using total average instead of bench-role opportunity.
 - Assuming all substitutes have similar entry times.
 - Failing to recheck eligibility after late team-sheet changes.
+
+
+## Persisted analysis evidence
+
+Use the CLI workflows in README.md: `sync`, `data status`, `analyze player`,
+`analyze matchups`, `analyze lineup`, and `compare`. Prefer stored fresh data;
+refresh missing or stale inputs. Include snapshot timestamps and warnings in
+advice. `--offline` permits stale facts with explicit uncertainty.
+
+Use `equipe.budget` for the effective salary cap and API `club_limit` for club
+constraints. Exactly one Fantasy bench player is impact x2; a real starter on
+the Fantasy bench is legal and receives half points before that multiplier.
+Unannounced clubs mean unknown role, not absence. See the corrected root rules.
+
+The v1 forecast applies `1 + 0.10 * domination` once. Detailed statistics explain
+the rating; do not add extra bonuses. Missing role history leaves projections
+unresolved. Current standings describe context; historical replay uses earlier
+results only. Do not certify projections as measured outcomes or infer a
+guaranteed improvement from conditional scenarios.

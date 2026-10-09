@@ -69,3 +69,22 @@ Do not certify lineup legality here. Use `auditing-fantasy-lineup` or `validatin
 - Treating one exceptional score as normal form.
 - Ignoring expected minutes.
 - Presenting an exact projection unsupported by the available data.
+
+
+## Persisted analysis evidence
+
+Use the CLI workflows in README.md: `sync`, `data status`, `analyze player`,
+`analyze matchups`, `analyze lineup`, and `compare`. Prefer stored fresh data;
+refresh missing or stale inputs. Include snapshot timestamps and warnings in
+advice. `--offline` permits stale facts with explicit uncertainty.
+
+Use `equipe.budget` for the effective salary cap and API `club_limit` for club
+constraints. Exactly one Fantasy bench player is impact x2; a real starter on
+the Fantasy bench is legal and receives half points before that multiplier.
+Unannounced clubs mean unknown role, not absence. See the corrected root rules.
+
+The v1 forecast applies `1 + 0.10 * domination` once. Detailed statistics explain
+the rating; do not add extra bonuses. Missing role history leaves projections
+unresolved. Current standings describe context; historical replay uses earlier
+results only. Do not certify projections as measured outcomes or infer a
+guaranteed improvement from conditional scenarios.

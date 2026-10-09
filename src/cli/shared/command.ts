@@ -34,3 +34,10 @@ export function createCommand() {
       return number;
     });
 }
+
+/** Command groups return the same help as --help, without direct console I/O. */
+export function groupCommand(description: string, context: CommandContext) {
+  return createCommand().description(description).action(function () {
+    context.setOutput(this.getHelp({ colors: false }));
+  });
+}

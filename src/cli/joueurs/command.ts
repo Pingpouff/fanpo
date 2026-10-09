@@ -5,13 +5,23 @@ import { type CommandContext, createCommand } from "../shared/command.ts";
 export function playersCommand(context: CommandContext) {
   return createCommand()
     .description(
-      "List players with optional local filters (combined with AND).",
+      "Find live players by club, position, name or availability.\n" +
+        "Filters combine with AND. Positions include secondary/tertiary roles. --available excludes flagged unavailable players; it does not confirm selection.",
     )
-    .option("--json", "Output JSON.")
-    .option("--club <code:filter>", "Match a club code (case insensitive).")
+    .example("Find a player ID", "deno task cli players --name Bamba")
+    .example(
+      "Filter candidates",
+      "deno task cli players --club UBB --position PIL --available",
+    )
+    .example("JSON for scripts", "deno task cli players --json")
+    .option("--json", "JSON response with the filtered player list.")
+    .option(
+      "--club <code:filter>",
+      "Exact club code, e.g. UBB or ST (case insensitive).",
+    )
     .option(
       "--position <code:filter>",
-      "Match any listed position (case insensitive).",
+      "Position code, e.g. PIL, TAL, DL, TL, N8, DM, OUV, AIL, CEN, ARR.",
     )
     .option(
       "--name <text:filter>",

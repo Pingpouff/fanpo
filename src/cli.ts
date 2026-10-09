@@ -1,3 +1,6 @@
+import { groupRootHelp } from "./cli/shared/help.ts";
+import { analysisCommands } from "./cli/context/analysis.ts";
+import { contextCommands } from "./cli/context/command.ts";
 import { FantasyClient } from "./client.ts";
 import { loadConfig } from "./config.ts";
 import { type CommandContext, createCommand } from "./cli/shared/command.ts";
@@ -18,17 +21,33 @@ export async function runCli(
       output = value;
     },
   };
-  const command = createCommand()
+  const root = createCommand();
+  contextCommands(root, context);
+  analysisCommands(root, context);
+  const command = root
     .name("deno task cli")
     .description(
-      "Inspect Fantasy Rugby players and compositions. Requires FANTASY_TOKEN for API requests.",
+      "Inspect live Fantasy Rugby data, cache it and compare projected lineups.\n" +
+        "Readable tables by default; add --json to a command for structured output.\n" +
+        "Online requests need FANTASY_TOKEN (.env). Cached analysis also needs deno task sqlite:setup.\n" +
+        "Run any command with --help for its options and examples.",
     )
+    .example("Current team and salary cap", "deno task cli composition")
+    .example(
+      "Prepare advice",
+      "deno task cli sync\ndeno task cli analyze lineup",
+    )
+    .example("Detailed help", "deno task cli analyze lineup --help")
     .noExit()
     .helpOption("-h, --help", "Show this help.", function () {
-      output = this.getHelp({ colors: false });
+      output = this === root
+        ? groupRootHelp(this.getHelp({ colors: false }))
+        : this.getHelp({ colors: false });
     })
     .action(function () {
-      output = this.getHelp({ colors: false });
+      output = this === root
+        ? groupRootHelp(this.getHelp({ colors: false }))
+        : this.getHelp({ colors: false });
     })
     .command("players", playersCommand(context))
     .command("player", playerSheetCommand(context))

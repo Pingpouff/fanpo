@@ -1,3 +1,11 @@
+import type { Matchday } from "./shared/types.ts";
+import type {
+  LocksResponse,
+  MatchesResponse,
+  RoundNotesResponse,
+  StandingsResponse,
+  TeamsheetsResponse,
+} from "./context/types.ts";
 import { type FantasyClientOptions, FantasyHttpClient } from "./http.ts";
 import { getPlayers } from "./joueurs/request.ts";
 import { getPlayerSheet, getPlayerSheets } from "./joueurs/fiche/request.ts";
@@ -14,6 +22,35 @@ export class FantasyClient {
     this.#http = new FantasyHttpClient(options);
   }
 
+  getRoundNotes(round: number) {
+    if (!Number.isSafeInteger(round) || round <= 0) {
+      throw new Error("Round must be a positive integer");
+    }
+    return this.#http.get<RoundNotesResponse>(
+      `/api/notes-journee?journee=${round}`,
+    );
+  }
+  getStandings() {
+    return this.#http.get<StandingsResponse>("/api/top14/classement");
+  }
+  async getMatches(round?: number) {
+    if (round !== undefined && (!Number.isSafeInteger(round) || round <= 0)) {
+      throw new Error("Round must be a positive integer");
+    }
+    const result = await this.#http.get<MatchesResponse>("/api/top14/matchs");
+    return round === undefined
+      ? result
+      : { ...result, matchs: result.matchs.filter((m) => m.journee === round) };
+  }
+  getRound() {
+    return this.#http.get<Matchday>("/api/journees/cible");
+  }
+  getTeamsheets() {
+    return this.#http.get<TeamsheetsResponse>("/api/feuilles");
+  }
+  getLocks() {
+    return this.#http.get<LocksResponse>("/api/compos/etat-verrou");
+  }
   getPlayers() {
     return getPlayers(this.#http);
   }

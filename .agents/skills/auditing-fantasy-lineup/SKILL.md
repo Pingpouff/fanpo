@@ -44,7 +44,7 @@ At minimum, verify all constraints for which the required data is available:
 - budget / salary cap;
 - maximum players per club;
 - captain eligibility if a captain is designated;
-- impact-player eligibility against the real team sheet;
+- one designated impact slot on the Fantasy bench; apply half-score penalty to real starters;
 - any lock or timing constraint relevant to the current state.
 
 ## Unknown is not valid
@@ -54,7 +54,7 @@ Missing information must not be treated as a pass.
 Examples:
 
 - Unknown price → budget status is `UNKNOWN`.
-- Unknown team-sheet status → impact-player eligibility is `UNKNOWN`.
+- Unknown team-sheet status → projected points are conditional; structural bench eligibility is unchanged.
 - Unknown club → club quota cannot be certified.
 
 ## Output example
@@ -81,3 +81,22 @@ PROVISIONAL
 - Mixing sporting recommendations into the audit.
 - Assuming a player is a substitute because the user placed them on the Fantasy bench.
 - Certifying a budget without all prices.
+
+
+## Persisted analysis evidence
+
+Use the CLI workflows in README.md: `sync`, `data status`, `analyze player`,
+`analyze matchups`, `analyze lineup`, and `compare`. Prefer stored fresh data;
+refresh missing or stale inputs. Include snapshot timestamps and warnings in
+advice. `--offline` permits stale facts with explicit uncertainty.
+
+Use `equipe.budget` for the effective salary cap and API `club_limit` for club
+constraints. Exactly one Fantasy bench player is impact x2; a real starter on
+the Fantasy bench is legal and receives half points before that multiplier.
+Unannounced clubs mean unknown role, not absence. See the corrected root rules.
+
+The v1 forecast applies `1 + 0.10 * domination` once. Detailed statistics explain
+the rating; do not add extra bonuses. Missing role history leaves projections
+unresolved. Current standings describe context; historical replay uses earlier
+results only. Do not certify projections as measured outcomes or infer a
+guaranteed improvement from conditional scenarios.

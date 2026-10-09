@@ -65,15 +65,23 @@ Deno.test("composition CLI displays API totals, captain, impact, real substitute
   assert(impactLine?.includes("[I]") && impactLine.includes("SUB"));
 });
 
-Deno.test("composition CLI detailed view preserves the raw historical response", async () => {
-  for (const flags of [["--detailed"], ["--detailed", "--json"]]) {
-    equal(
-      JSON.parse(
-        await runCli(["composition", "--round", "4", ...flags], client()),
+Deno.test("composition CLI detailed view is human readable unless json is requested", async () => {
+  const output = await runCli(
+    ["composition", "--round", "4", "--detailed"],
+    client(),
+  );
+  assert(output.includes("Total points:"));
+  assert(output.includes("Value change"));
+  assert(!output.includes("{"));
+  equal(
+    JSON.parse(
+      await runCli(
+        ["composition", "--round", "4", "--detailed", "--json"],
+        client(),
       ),
-      historicalComposition,
-    );
-  }
+    ),
+    historicalComposition,
+  );
 });
 
 Deno.test("composition CLI handles manual captain and nullable performance data", async () => {
@@ -139,6 +147,7 @@ Deno.test("composition CLI defaults to resource 1 and the current endpoint", asy
     const args of [["composition", "--json"], [
       "composition",
       "--detailed",
+      "--json",
     ]]
   ) {
     const currentClient = new FantasyClient({
@@ -238,7 +247,7 @@ Deno.test("current composition defaults to a compact table with unavailable outc
       "Status: validee",
       "Total points: -",
       "Test team",
-      "Budget: 11.15 / Cap: 11.00",
+      "Budget: 11.15 (effective salary cap) / Cap: 11.00 (reference)",
       "Paid",
       "Min",
       "Score",
@@ -278,4 +287,15 @@ Deno.test("current composition handles empty or absent selections", async () => 
     assert(!output.includes("[C]"));
     assert(!output.includes("[I]"));
   }
+});
+
+Deno.test("current detailed composition uses a readable position table", async () => {
+  const currentClient = new FantasyClient({
+    baseUrl: "https://example.test",
+    token: "test-token",
+    fetch: () => Promise.resolve(Response.json(currentComposition)),
+  });
+  const text = await runCli(["composition", "--detailed"], currentClient);
+  assert(text.includes("Position"));
+  assert(!text.includes("{"));
 });

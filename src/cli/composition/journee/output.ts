@@ -5,12 +5,22 @@ export function renderHistoricalComposition(
   response: HistoricalCompositionResponse,
   options: OutputOptions = {},
 ): string {
-  if (options.json || options.detailed) {
+  if (options.json) {
     return JSON.stringify(response, null, 2);
   }
   const { compo } = response;
   const slots = compo.slots.length === 0 ? "No slots." : renderTable([
-    ["#", "Player", "Club", "Paid", "Min", "Score", "Points", ""],
+    [
+      "#",
+      "Player",
+      "Club",
+      "Paid",
+      "Min",
+      "Score",
+      "Points",
+      "",
+      ...(options.detailed ? ["Value change"] : []),
+    ],
     ...compo.slots.map((slot) => {
       const markers = [
         slot.slot === compo.capitaine_slot
@@ -29,6 +39,9 @@ export function renderHistoricalComposition(
         slot.note?.toFixed(2) ?? "-",
         slot.points?.toFixed(2) ?? "-",
         markers,
+        ...(options.detailed
+          ? [slot.delta_valeur == null ? "-" : String(slot.delta_valeur)]
+          : []),
       ];
     }),
   ]);
