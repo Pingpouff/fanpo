@@ -1,6 +1,8 @@
+import { type DataAccessMetadata, jsonBytes } from "./metadata.ts";
 import type { FantasyClient } from "../api/client.ts";
 import type { Snapshot, Store } from "../data/store.ts";
 export interface RefreshOptions {
+  onDataAccess?: (event: DataAccessMetadata) => void;
   offline?: boolean;
   force?: boolean;
   now?: Date;
@@ -63,6 +65,10 @@ export async function acquire(
     const previous = store.read(e);
     return options.force || !previous || stale(previous, round, now);
   });
+  const writes = new Map<
+    string,
+    { storage: DataAccessMetadata["storage"]; storedBytes: number }
+  >();
   let index = 0;
   if (!options.offline) {
     await Promise.all(
@@ -71,7 +77,9 @@ export async function acquire(
           const endpoint = pending[index++];
           try {
             const data = await fetchEndpoint(getClient(), endpoint);
-            await store.save(
+            writes.set(endpoint, { storage: "failed", storedBytes: 0 });
+            const previous = store.read(endpoint);
+            const saved = await store.save(
               endpoint,
               data,
               endpoint === "/api/journees/cible"
@@ -79,6 +87,10 @@ export async function acquire(
                 : round,
               now.toISOString(),
             );
+            writes.set(endpoint, {
+              storage: "stored",
+              storedBytes: saved.id === previous?.id ? 0 : jsonBytes(data),
+            });
           } catch (error) {
             failures.push({
               endpoint,
@@ -91,6 +103,28 @@ export async function acquire(
   }
   const evidence = unique.flatMap((endpoint) => {
     const snapshot = store.read(endpoint);
+    const write = writes.get(endpoint);
+    options.onDataAccess?.({
+      endpoint,
+      source: write?.storage === "stored"
+        ? "network"
+        : snapshot
+        ? "cache"
+        : "missing",
+      cacheStatus: snapshot
+        ? (stale(snapshot, round, now) ? "stale" : "fresh")
+        : "missing",
+      fetchedAt: snapshot?.fetchedAt,
+      snapshotId: snapshot?.id,
+      storage: write?.storage ??
+        (pending.includes(endpoint) && !options.offline
+          ? "not-stored"
+          : snapshot
+          ? "reused"
+          : "not-stored"),
+      storedBytes: write?.storedBytes ?? 0,
+      cacheBytes: snapshot ? jsonBytes(snapshot.data) : 0,
+    });
     if (!snapshot) {
       warnings.push(`Missing data: ${endpoint}`);
       return [];

@@ -79,3 +79,63 @@ Deno.test("partial acquisition keeps successful sources and bounds concurrent HT
     db.close();
   }
 });
+
+Deno.test("data-access metadata distinguishes persisted payloads, cache hits, offline stale reads and failed writes", async () => {
+  const db = new Store(":memory:", {
+    origin: "https://example.com",
+    season: "2026-27",
+    profile: "test",
+  });
+  const events: import("../src/operations/metadata.ts").DataAccessMetadata[] =
+    [];
+  const client = new FantasyClient({
+    baseUrl: "https://example.com",
+    token: "test",
+    fetch: () => Promise.resolve(Response.json({ matchs: [] })),
+  });
+  const onDataAccess = (
+    event: import("../src/operations/metadata.ts").DataAccessMetadata,
+  ) => events.push(event);
+  try {
+    await acquire(db, () => client, ["/api/top14/matchs"], 6, { onDataAccess });
+    equal(events[0].source, "network");
+    equal(events[0].storage, "stored");
+    equal(
+      events[0].storedBytes,
+      new TextEncoder().encode('{"matchs":[]}').length,
+    );
+    assert(events[0].snapshotId);
+    await acquire(db, () => client, ["/api/top14/matchs"], 6, { onDataAccess });
+    equal(events[1].source, "cache");
+    equal(events[1].storage, "reused");
+    equal(events[1].storedBytes, 0);
+    await acquire(
+      db,
+      () => {
+        throw new Error("No credentials");
+      },
+      ["/api/top14/matchs"],
+      7,
+      { offline: true, onDataAccess },
+    );
+    equal(events[2].cacheStatus, "stale");
+    equal(events[2].storedBytes, 0);
+    const invalid = new FantasyClient({
+      baseUrl: "https://example.com",
+      token: "test",
+      fetch: () =>
+        Promise.resolve(
+          Response.json({ joueurs: [{ id: 1, club: "A", valeur: "bad" }] }),
+        ),
+    });
+    const result = await acquire(db, () => invalid, ["/api/joueurs"], 6, {
+      onDataAccess,
+    });
+    equal(result.failures.length, 1);
+    equal(events[3].storage, "failed");
+    equal(events[3].storedBytes, 0);
+    equal(events[3].cacheStatus, "missing");
+  } finally {
+    db.close();
+  }
+});

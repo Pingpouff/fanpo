@@ -1,8 +1,10 @@
+import type { DataAccessMetadata } from "../../operations/metadata.ts";
 import { Command, ValidationError } from "@cliffy/command";
 import type { FantasyClient } from "../../api/client.ts";
 
 export interface CommandContext {
   getClient: () => FantasyClient;
+  recordDataAccess?: (event: DataAccessMetadata) => void;
   setOutput: (output: string) => void;
 }
 

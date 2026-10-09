@@ -1,3 +1,4 @@
+import { jsonBytes } from "../../operations/metadata.ts";
 import type { Player } from "../../api/joueurs/types.ts";
 import { renderAnalysis } from "./output.ts";
 import {
@@ -118,6 +119,18 @@ export function analysisCommands(
         const round =
           store.read<{ numero: number }>("/api/journees/cible")?.data.numero ??
             0;
+        for (const s of store.status()) {
+          context.recordDataAccess?.({
+            endpoint: s.endpoint,
+            source: "cache",
+            cacheStatus: stale(s, round) ? "stale" : "fresh",
+            fetchedAt: s.fetchedAt,
+            snapshotId: s.id,
+            storage: "reused",
+            storedBytes: 0,
+            cacheBytes: jsonBytes(store.read(s.endpoint)!.data),
+          });
+        }
         value = {
           scope: {
             origin,
@@ -134,6 +147,7 @@ export function analysisCommands(
         const { advise } = await import("../../operations/advice.ts");
         value = await advise(store, context.getClient, {
           ...o,
+          onDataAccess: context.recordDataAccess,
           kind,
           ids,
           compositionId: o.composition,

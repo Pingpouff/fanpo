@@ -6,13 +6,21 @@ import type {
   StandingsResponse,
   TeamsheetsResponse,
 } from "./context/types.ts";
-import { type FantasyClientOptions, FantasyHttpClient } from "./http.ts";
+import {
+  type FantasyClientOptions,
+  FantasyHttpClient,
+  type RequestObserver,
+} from "./http.ts";
 import { getPlayers } from "./joueurs/request.ts";
 import { getPlayerSheet, getPlayerSheets } from "./joueurs/fiche/request.ts";
 import { getComposition } from "./composition/request.ts";
 import { getCompositionForRound } from "./composition/journee/request.ts";
 export { FantasyHttpError } from "./http.ts";
-export type { FantasyClientOptions } from "./http.ts";
+export type {
+  FantasyClientOptions,
+  RequestMetadata,
+  RequestObserver,
+} from "./http.ts";
 
 /** Reusable facade; endpoint implementations live in their feature folders. */
 export class FantasyClient {
@@ -20,6 +28,11 @@ export class FantasyClient {
 
   constructor(options: FantasyClientOptions) {
     this.#http = new FantasyHttpClient(options);
+  }
+
+  /** Subscribe to completed requests; call the returned function to detach. */
+  observeRequests(observer: RequestObserver) {
+    return this.#http.observeRequests(observer);
   }
 
   getRoundNotes(round: number) {

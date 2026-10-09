@@ -92,10 +92,10 @@ copyable examples, e.g. `deno task cli analyze lineup --help`.
 | `analyze lineup`             | Team legality, budget and projected points          | `--lineup FILE`, `--composition`                |
 | `compare --alternative FILE` | Proposed vs current team, or two saved teams        | `--lineup FILE` supplies the before team        |
 
-All leaf commands support `--json`; all commands support `-h` / `--help`. Live
-inspection commands (`players`, `player`, `composition`, `round`, `teamsheets`,
-`locks`, `ratings`, `top14 ...`) request the API each time and require
-`FANTASY_TOKEN`. They do not populate the analysis cache.
+All leaf commands support `--json`; all commands support `--debug` and `-h` /
+`--help`. Live inspection commands (`players`, `player`, `composition`, `round`,
+`teamsheets`, `locks`, `ratings`, `top14 ...`) request the API each time and
+require `FANTASY_TOKEN`. They do not populate the analysis cache.
 
 ### Cached command options
 
@@ -119,6 +119,46 @@ necessarily every source; use `--force` for a full requested refresh. Run
 sqlite:setup` before any cached command. Custom paths outside
 `.data/` require a direct `deno run` invocation with suitable permissions; see
 native setup below.
+
+### Request metadata (`--debug`)
+
+Metadata is hidden by default. Add `--debug` to an API, data or analysis
+command:
+
+```sh
+deno task cli composition --debug
+deno task cli sync --force --debug
+deno task cli analyze lineup --offline --debug
+deno task cli composition --debug --json | jq '.metadata'
+deno task cli composition --debug --json | jq -r '.data.equipe.budget'
+```
+
+Human output adds a **Request metadata** section. With `--debug --json`, stdout
+is one JSON object with **`data`** (the usual result) and **`metadata`**.
+Without `--debug`, existing JSON shapes stay unchanged, including multi-player
+arrays. Help has no request metadata because it does not access data.
+
+| Metadata                                     | Meaning                                                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `startedAt`, `durationMs`                    | UTC command start and total elapsed milliseconds.                                                                               |
+| `requestCount`                               | HTTP requests actually made; zero for fully cached/offline reads.                                                               |
+| `requests[]`                                 | Each endpoint's start, duration, HTTP status, response bytes, outcome and storage result. Batch commands include every request. |
+| `totalResponseBytes`, `unknownResponseSizes` | Sum of measured body bytes, plus count of unmeasured responses.                                                                 |
+| `storedPayloadBytes`                         | Logical JSON payload bytes newly persisted during this command.                                                                 |
+| `dataAccess[]`                               | Per-source network/cache/missing state, freshness, fetch time, snapshot ID, stored payload size and cached payload size.        |
+
+Request duration covers fetching, reading the body and parsing JSON. Response
+sizes are **uncompressed body bytes**, before local filters/quick views; they do
+not measure HTTP headers or compressed wire traffic. Failed requests can have an
+unknown size (`null`), rather than a misleading zero. Stored/cache sizes
+describe compact UTF-8 JSON payloads, **not SQLite file growth**, indexes or
+duplicated normalized rows. Cache reuse writes zero bytes. Live inspection
+commands do not store data; `sync` and analysis refreshes do.
+
+Failed writes are marked `failed`; failed refreshes retain any previous cached
+snapshot. Fatal command errors still exit with status 1 and write diagnostics to
+stderr; with both debug/JSON flags, those diagnostics contain `error` and
+`metadata`. Tokens, headers and response bodies are excluded from metadata.
 
 ### Read the results
 
@@ -329,6 +369,9 @@ Public connector API:
 - `client.getLocks()`: `GET /api/compos/etat-verrou` (server lock state).
 - `client.getRoundNotes(round)`: `GET /api/notes-journee?journee=N`; official
   ratings and designated withdrawal IDs. Requires a positive safe round number.
+- `client.observeRequests(observer)`: receive per-request timing, status, byte
+  count and outcome without changing response models. Returns an unsubscribe
+  function. The CLI subscribes only in debug mode.
 - `FantasyHttpError`: non-2xx failures include the numeric `status` and
   endpoint. Response bodies are omitted from error messages.
 - `loadConfig()`: reads `FANTASY_TOKEN` and `FANTASY_API_URL`; returns
@@ -419,7 +462,9 @@ modules own command parsing, local filtering and output rendering. The
 composition folder uses the feature name; its HTTP routes remain `/api/compos`.
 The public client stays independent of Cliffy and terminal output. Existing
 imports from `src/client.ts`, `src/types.ts` and `src/filters.ts` remain
-supported. `runCli()` returns output without printing or exiting.
+supported. `runCli()` returns output without printing or exiting. Its optional
+third argument receives command metadata when debug mode accesses data,
+including on request failures.
 
 Models preserve additional API fields and trust known fields without runtime
 validation. Current composition field names follow an inspected response sample;
