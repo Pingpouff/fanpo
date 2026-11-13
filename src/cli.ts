@@ -7,6 +7,7 @@ import { analysisCommands } from "./cli/context/analysis.ts";
 import { contextCommands } from "./cli/context/command.ts";
 import { FantasyClient } from "./client.ts";
 import { loadConfig } from "./config.ts";
+import { type Competition, competitionName } from "./api/competition.ts";
 import { type CommandContext, createCommand } from "./cli/shared/command.ts";
 import { playersCommand } from "./cli/joueurs/command.ts";
 import { playerSheetCommand } from "./cli/joueurs/fiche/command.ts";
@@ -21,11 +22,13 @@ export async function runCli(
   let output = "";
   let debug = false;
   let noColor = false;
+  let competition: Competition = "top14";
   const startedAt = new Date().toISOString(), started = performance.now();
   const requests: RequestMetadata[] = [], dataAccess: DataAccessMetadata[] = [];
   let unsubscribe: (() => void) | undefined;
   const getClient = () => {
     client ??= new FantasyClient(loadConfig());
+    client = client.forCompetition(competition);
     if (debug && !unsubscribe) {
       unsubscribe = client.observeRequests((event) => requests.push(event));
     }
@@ -33,6 +36,7 @@ export async function runCli(
   };
   const context: CommandContext = {
     getClient,
+    getCompetition: () => competition,
     get recordDataAccess() {
       return debug
         ? (event: DataAccessMetadata) => {
@@ -49,6 +53,14 @@ export async function runCli(
   analysisCommands(root, context);
   const command = root
     .name("deno task cli")
+    .globalOption(
+      "--nationchampionship",
+      "Use Nations Championship instead of Top 14 (including its separate cache).",
+      (value) => {
+        competition = value ? "nationchampionship" : "top14";
+        return value;
+      },
+    )
     .globalOption(
       "--no-color",
       "Disable ANSI colors in readable output.",
@@ -95,6 +107,13 @@ export async function runCli(
     // first so --no-color --help remains usable without relaxing help validation.
     const separator = args.indexOf("--");
     const parseArgs = args.filter((arg, index) => {
+      if (
+        arg === "--nationchampionship" && args.includes("--help") &&
+        (separator < 0 || index < separator)
+      ) {
+        competition = "nationchampionship";
+        return false;
+      }
       if (arg === "--no-color" && (separator < 0 || index < separator)) {
         noColor = true;
         return false;
@@ -140,9 +159,19 @@ export async function runCli(
   if (metadata) {
     return json
       ? JSON.stringify({ data: JSON.parse(output), metadata }, null, 2)
-      : humanColors(`${output}\n\n${renderMetadata(metadata)}`, noColor);
+      : humanColors(
+        `${
+          competition === "top14" ? "" : `${competitionName(competition)}\n\n`
+        }${output}\n\n${renderMetadata(metadata)}`,
+        noColor,
+      );
   }
-  return json ? output : humanColors(output, noColor);
+  return json ? output : humanColors(
+    `${
+      competition === "top14" ? "" : `${competitionName(competition)}\n\n`
+    }${output}`,
+    noColor,
+  );
 }
 
 if (import.meta.main) {

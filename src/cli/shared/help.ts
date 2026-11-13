@@ -12,6 +12,8 @@ export function groupRootHelp(help: string): string {
         "locks",
         "ratings",
         "top14",
+        "competition",
+        "games",
       ],
     },
     { title: "Data (local cache)", names: ["sync", "data"] },

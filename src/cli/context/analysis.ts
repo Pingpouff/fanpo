@@ -62,7 +62,6 @@ function options() {
     ).option("--json", "Structured JSON evidence").option(
       "--composition <id:positiveInteger>",
       "Team resource ID for sync, lineup and compare.",
-      { default: 1 },
     );
 }
 async function readLineup(path: string): Promise<Lineup> {
@@ -131,6 +130,7 @@ export function analysisCommands(
       origin,
       season: o.season ?? season(),
       profile: o.profile ?? "default",
+      competition: context.getCompetition(),
     });
     try {
       let value: unknown;
@@ -187,6 +187,7 @@ export function analysisCommands(
             origin,
             season: o.season ?? season(),
             profile: o.profile ?? "default",
+            competition: context.getCompetition(),
           },
           round,
           snapshots: store.status().map((s) => ({

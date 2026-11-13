@@ -1,3 +1,6 @@
+import { type Competition, validateCompetition } from "./competition.ts";
+import type { GamesResponse } from "./jeux/types.ts";
+
 /** HTTP timings cover fetch, body read and JSON parsing; bytes are decoded body bytes. */
 export interface RequestMetadata {
   endpoint: string;
@@ -12,6 +15,7 @@ export type RequestObserver = (metadata: RequestMetadata) => void;
 export interface FantasyClientOptions {
   baseUrl: string;
   token: string;
+  competition?: Competition;
   /** Defaults to native fetch; can be replaced for offline tests. */
   fetch?: (url: URL, init: RequestInit) => Promise<Response>;
 }
@@ -30,8 +34,11 @@ export class FantasyHttpClient {
   readonly #baseUrl: URL;
   readonly #token: string;
   readonly #fetch: NonNullable<FantasyClientOptions["fetch"]>;
+  readonly #competition: Competition;
+  #gameId: Promise<number> | undefined;
 
   constructor(options: FantasyClientOptions) {
+    this.#competition = validateCompetition(options.competition ?? "top14");
     const token = options.token.trim();
     if (!token) throw new Error("Fantasy API token must not be blank.");
     let baseUrl: URL;
@@ -61,6 +68,33 @@ export class FantasyHttpClient {
   }
 
   async get<T>(path: string): Promise<T> {
+    const gameId = path === "/api/jeux" || this.#competition === "top14"
+      ? undefined
+      : await this.#resolveGameId();
+    return this.#request<T>(path, gameId);
+  }
+
+  #resolveGameId(): Promise<number> {
+    this.#gameId ??= this.#request<GamesResponse>("/api/jeux")
+      .then((games) => {
+        const game = games.jeux?.find((g) => g.code === "NC");
+        if (
+          !games.multi || !game || !Number.isSafeInteger(game.id) ||
+          game.id <= 0
+        ) {
+          throw new Error(
+            "Nations Championship is not available for this account.",
+          );
+        }
+        return game.id;
+      }).catch((error) => {
+        this.#gameId = undefined;
+        throw error;
+      });
+    return this.#gameId;
+  }
+
+  async #request<T>(path: string, gameId?: number): Promise<T> {
     const startedAt = new Date().toISOString(), started = performance.now();
     let status: number | null = null, responseBytes: number | null = null;
     let outcome: RequestMetadata["outcome"] = "network-error";
@@ -72,6 +106,7 @@ export class FantasyHttpClient {
           headers: {
             Authorization: `Bearer ${this.#token}`,
             Accept: "application/json",
+            ...(gameId === undefined ? {} : { "X-PB-Jeu": String(gameId) }),
           },
           redirect: "error",
         });

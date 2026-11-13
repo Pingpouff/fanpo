@@ -68,6 +68,69 @@ value in millions (requires `jq`):
 deno task cli composition --json | jq -r '.equipe.budget'
 ```
 
+## Competitions
+
+**Top 14 is the default.** Add `--nationchampionship` to use Nations
+Championship. The flag works before or after the command, including nested
+analysis and cache commands. No numeric competition ID is needed.
+
+```sh
+deno task cli games                                 # Available competitions
+deno task cli teamsheets                            # Top 14
+deno task cli teamsheets --nationchampionship        # International teamsheets
+deno task cli composition --nationchampionship       # Your international team
+deno task cli competition matches --nationchampionship
+deno task cli sync --nationchampionship
+deno task cli analyze lineup --nationchampionship --offline
+deno task cli data players --nationchampionship --position TL
+deno task cli data status --nationchampionship
+```
+
+The client discovers Nations Championship through `/api/jeux` and sends its
+account-specific ID in `X-PB-Jeu` on every competition-scoped request. An
+unavailable competition produces an error; it never falls back to Top 14.
+`games --json` preserves the complete discovery response. The neutral
+`competition standings` and `competition matches` commands work for either
+competition; existing `top14 standings/matches` remain compatibility aliases and
+also honor the flag.
+
+Without the flag, composition resource ID defaults to `1`, as before. With the
+flag, the default is your global/official normal trading league, discovered from
+`/api/ligues/mes-ligues`. An explicit composition ID must belong to your
+international leagues; an explicit player ID must belong to the international
+catalogue. The server can otherwise return a Top 14 resource even when the
+international header is sent, so these checks are essential.
+
+SQLite scopes snapshots and normalized facts by competition as well as origin,
+season and profile. Existing Top 14 cache keys are preserved. Always use the
+same flag for `sync`, `data`, `analyze` and `compare`. Offline commands read the
+selected cache without credentials or network discovery. `--season` remains a
+local storage label; it does not select the competition or an upstream season.
+Budgets, club/nation limits and format constraints come from the selected team.
+International forecasts use the existing model with an explicit warning that it
+has not been validated for international rugby.
+
+For programmatic use, select a named context rather than adding headers to
+individual endpoints:
+
+```ts
+import { FantasyClient } from "./src/client.ts";
+import { loadConfig } from "./src/config.ts";
+
+const top14 = new FantasyClient(loadConfig());
+const nations = top14.forCompetition("nationchampionship");
+// Equivalent: new FantasyClient({ ...loadConfig(), competition: "nationchampionship" });
+const games = await top14.getGames();
+const sheets = await nations.getTeamsheets();
+const team = await nations.getComposition(); // Discovers your NC league
+```
+
+`competition` accepts `"top14"` (default) or `"nationchampionship"`. Clients are
+independent contexts; `forCompetition()` preserves credentials and injected
+fetch without changing the original client. Request observers attach to the
+returned client and include discovery requests. Raw API envelopes retain their
+original schema; analysis JSON and cache status identify their competition.
+
 ### Command reference
 
 Top-level `--help` groups commands into **API** (live requests), **Data** (local
@@ -343,12 +406,13 @@ deno run --no-prompt --allow-env=FANTASY_TOKEN,FANTASY_API_URL \
 
 ### Compositions
 
-`composition` defaults to resource ID `1`. Without `--round`, it retrieves the
-current composition from `/api/compos/1`. With `--round 4`, it retrieves
-`/api/compos/1/journee/4`. An explicit ID is also supported, for example
-`composition 2` or `composition 2 --round 4`. IDs and round numbers must be
-positive safe integers. The resource ID is passed through without assigning it a
-team, manager or other meaning.
+For Top 14, `composition` defaults to resource ID `1`. With
+`--nationchampionship`, it discovers your normal international league instead.
+Without `--round`, it retrieves the current composition from `/api/compos/1`.
+With `--round 4`, it retrieves `/api/compos/1/journee/4`. An explicit ID is also
+supported, for example `composition 2` or `composition 2 --round 4`. IDs and
+round numbers must be positive safe integers. The resource ID is passed through
+without assigning it a team, manager or other meaning.
 
 Current compositions use the same compact table as historical rounds, with
 round, deadline, status, player names, clubs, paid prices and captain/impact
@@ -460,8 +524,10 @@ Public connector API:
 
 Network and malformed JSON failures have contextual errors. Redirects are
 rejected to keep authenticated requests on the configured endpoint. The API
-client performs no retries or caching; cached CLI operations handle persistence
-separately.
+client performs no automatic retries. Competition discovery, league selection
+and international player-membership checks share in-memory lookups within one
+client; `getLeagues()` explicitly refreshes its lookup. API resource reads
+remain live, and cached CLI operations handle SQLite persistence separately.
 
 ## Development
 

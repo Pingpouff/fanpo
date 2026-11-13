@@ -30,6 +30,8 @@ export function fetchEndpoint(
   switch (endpoint) {
     case "/api/joueurs":
       return client.getPlayers();
+    case "/api/ligues/mes-ligues":
+      return client.getLeagues();
     case "/api/journees/cible":
       return client.getRound();
     case "/api/top14/matchs":
@@ -71,12 +73,16 @@ export async function acquire(
   >();
   let index = 0;
   if (!options.offline) {
+    const client = pending.length ? getClient() : undefined;
+    if (client && client.competition !== store.competition) {
+      throw new Error("API client and cache competition must match.");
+    }
     await Promise.all(
       Array.from({ length: Math.min(5, pending.length) }, async () => {
         while (index < pending.length) {
           const endpoint = pending[index++];
           try {
-            const data = await fetchEndpoint(getClient(), endpoint);
+            const data = await fetchEndpoint(client!, endpoint);
             writes.set(endpoint, { storage: "failed", storedBytes: 0 });
             const previous = store.read(endpoint);
             const saved = await store.save(

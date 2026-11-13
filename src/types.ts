@@ -6,3 +6,6 @@ export type * from "./api/composition/types.ts";
 export type * from "./api/composition/journee/types.ts";
 
 export type * from "./api/context/types.ts";
+export type * from "./api/competition.ts";
+export type * from "./api/jeux/types.ts";
+export type * from "./api/ligues/types.ts";

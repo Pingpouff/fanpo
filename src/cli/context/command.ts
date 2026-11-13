@@ -21,90 +21,124 @@ export function contextCommands(
         rows ?? [["No data."]],
       ),
     );
-  root.command(
-    "top14",
-    groupCommand(
-      "Inspect live Top 14 standings, fixtures and results.",
-      context,
-    )
-      .command(
-        "standings",
-        createCommand().description(
-          "Show current Top 14 ranking, league points, record and points difference.",
+  for (const name of ["competition", "top14"]) {
+    root.command(
+      name,
+      groupCommand(
+        "Inspect standings, fixtures and results for the selected competition. Top 14 by default.",
+        context,
+      )
+        .command(
+          "standings",
+          createCommand().description(
+            "Show ranking, league points, record and points difference for the selected competition.",
+          )
+            .example("League table", `deno task cli ${name} standings`)
+            .option("--json", "Complete API response as JSON.").action(
+              async (o) => {
+                const value = await context.getClient().getStandings();
+                output(
+                  value,
+                  o.json,
+                  o.json ? undefined : [
+                    [
+                      "Rank",
+                      "Club",
+                      "Played",
+                      "Points",
+                      "Wins",
+                      "Draws",
+                      "Losses",
+                      "Diff",
+                    ],
+                    ...value.classement.map((s) =>
+                      [
+                        tone(String(s.position)),
+                        s.abrev,
+                        s.joues,
+                        s.points,
+                        s.victoires,
+                        s.nuls,
+                        s.defaites,
+                        signed(s.diff, String(s.diff)),
+                      ].map(String)
+                    ),
+                  ],
+                );
+              },
+            ),
         )
-          .example("League table", "deno task cli top14 standings")
-          .option("--json", "Complete API response as JSON.").action(
-            async (o) => {
-              const value = await context.getClient().getStandings();
+        .command(
+          "matches",
+          createCommand().description(
+            "Show all season fixtures/results, or one round. Home team is listed first.",
+          )
+            .example(
+              "Round fixtures",
+              `deno task cli ${name} matches --round 6`,
+            )
+            .example(
+              "All season results",
+              `deno task cli ${name} matches --json`,
+            )
+            .option("--json", "Complete API envelope with matching fixtures.")
+            .option(
+              "--round <round:positiveInteger>",
+              "Round number; omit for all fixtures (filtered locally).",
+            ).action(async (o) => {
+              const value = await context.getClient().getMatches(o.round);
               output(
                 value,
                 o.json,
                 o.json ? undefined : [
-                  [
-                    "Rank",
-                    "Club",
-                    "Played",
-                    "Points",
-                    "Wins",
-                    "Draws",
-                    "Losses",
-                    "Diff",
-                  ],
-                  ...value.classement.map((s) =>
-                    [
-                      tone(String(s.position)),
-                      s.abrev,
-                      s.joues,
-                      s.points,
-                      s.victoires,
-                      s.nuls,
-                      s.defaites,
-                      signed(s.diff, String(s.diff)),
-                    ].map(String)
+                  ["Round", "Date", "Home", "Away", "Score", "Status"],
+                  ...value.matchs.map(
+                    (m) => [
+                      String(m.journee),
+                      m.date,
+                      m.dom.abrev,
+                      m.ext.abrev,
+                      m.dom.score === null || m.ext.score === null
+                        ? "-"
+                        : `${
+                          signed(m.dom.score - m.ext.score, String(m.dom.score))
+                        } - ${
+                          signed(m.ext.score - m.dom.score, String(m.ext.score))
+                        }`,
+                      status(m.statut),
+                    ],
                   ),
                 ],
               );
-            },
-          ),
-      )
-      .command(
-        "matches",
-        createCommand().description(
-          "Show all season fixtures/results, or one round. Home team is listed first.",
-        )
-          .example("Round fixtures", "deno task cli top14 matches --round 6")
-          .example("All season results", "deno task cli top14 matches --json")
-          .option("--json", "Complete API envelope with matching fixtures.")
-          .option(
-            "--round <round:positiveInteger>",
-            "Round number; omit for all fixtures (filtered locally).",
-          ).action(async (o) => {
-            const value = await context.getClient().getMatches(o.round);
-            output(
-              value,
-              o.json,
-              o.json ? undefined : [
-                ["Round", "Date", "Home", "Away", "Score", "Status"],
-                ...value.matchs.map(
-                  (m) => [
-                    String(m.journee),
-                    m.date,
-                    m.dom.abrev,
-                    m.ext.abrev,
-                    m.dom.score === null || m.ext.score === null
-                      ? "-"
-                      : `${
-                        signed(m.dom.score - m.ext.score, String(m.dom.score))
-                      } - ${
-                        signed(m.ext.score - m.dom.score, String(m.ext.score))
-                      }`,
-                    status(m.statut),
-                  ],
-                ),
-              ],
-            );
-          }),
-      ),
+            }),
+        ),
+    );
+  }
+  root.command(
+    "games",
+    createCommand().description(
+      "Discover competitions available to your account. Use --nationchampionship to select NC; Top 14 is the default.",
+    ).example("Available competitions", "deno task cli games")
+      .option("--json", "Complete competition discovery response.")
+      .action(async (o) => {
+        const value = await context.getClient().getGames();
+        output(
+          value,
+          o.json,
+          o.json ? undefined : [
+            ["Code", "Competition", "Season", "Club / nation limit", "Member"],
+            ...value.jeux.map((
+              g,
+            ) => [
+              g.code,
+              g.nom,
+              g.label ?? "-",
+              String(g.club_limit ?? "-"),
+              g.membre === undefined ? "-" : g.membre ? "Yes" : "No",
+            ]),
+          ],
+        );
+      }),
   );
   root.command(
     "round",

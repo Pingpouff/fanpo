@@ -1,4 +1,6 @@
 import type { FantasyClient } from "../api/client.ts";
+import type { League } from "../api/ligues/types.ts";
+import { selectCompositionId } from "../api/ligues/selection.ts";
 import type { Store } from "../data/store.ts";
 import type { Matchday } from "../api/shared/types.ts";
 import type {
@@ -76,8 +78,22 @@ export async function advise(
       }`,
     );
   }
-  const compEndpoint = `/api/compos/${request.compositionId ?? 1}`;
   const needsTeam = ["sync", "lineup", "compare"].includes(request.kind);
+  let compositionId = request.compositionId ?? 1;
+  if (needsTeam && store.competition === "nationchampionship") {
+    const endpoint = "/api/ligues/mes-ligues";
+    const leagues = await acquire(store, getClient, [endpoint], round, request);
+    preflight.evidence.push(...leagues.evidence);
+    preflight.warnings.push(...leagues.warnings);
+    const available = store.read<League[]>(endpoint)?.data;
+    if (!available) {
+      throw new Error(
+        "Nations Championship leagues unavailable. Run sync online with --nationchampionship.",
+      );
+    }
+    compositionId = selectCompositionId(available, request.compositionId);
+  }
+  const compEndpoint = `/api/compos/${compositionId}`;
   const endpoints = ["/api/top14/matchs", "/api/top14/classement"];
   if (request.kind !== "matchups") {
     endpoints.push(
@@ -329,11 +345,19 @@ export async function advise(
       : { before, ...comparison(request.alternative!) };
   }
   return {
+    competition: store.competition,
     model: MODEL,
     round,
     fullyCurrent: warnings.length === 0,
     evidence,
-    warnings,
+    warnings: [
+      ...warnings,
+      ...(store.competition === "nationchampionship" && request.kind !== "sync"
+        ? [
+          "Forecast model is exploratory for international rugby; it has not been validated for this competition.",
+        ]
+        : []),
+    ],
     result,
   };
 }

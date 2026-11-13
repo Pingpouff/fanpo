@@ -1,8 +1,10 @@
 import { Database } from "@db/sqlite";
+import { type Competition, validateCompetition } from "../api/competition.ts";
 export interface Scope {
   origin: string;
   season: string;
   profile: string;
+  competition?: Competition;
 }
 export interface Snapshot<T = unknown> {
   id: number;
@@ -23,9 +25,11 @@ interface Row {
 import { money } from "./money.ts";
 export { money } from "./money.ts";
 export class Store {
+  readonly competition: Competition;
   readonly #db: Database;
   readonly #scope: string;
   constructor(path: string, scope: Scope) {
+    this.competition = validateCompetition(scope.competition ?? "top14");
     const origin = new URL(scope.origin);
     if (origin.username || origin.password || origin.search) {
       throw new Error("Origin must not contain credentials");
@@ -33,7 +37,15 @@ export class Store {
     if (!scope.season.trim() || !scope.profile.trim()) {
       throw new Error("Season and profile required");
     }
-    this.#scope = JSON.stringify({ ...scope, origin: origin.origin });
+    // Preserve the original principal-game key, independent of input property order.
+    this.#scope = JSON.stringify({
+      origin: origin.origin,
+      season: scope.season,
+      profile: scope.profile,
+      ...(this.competition === "top14"
+        ? {}
+        : { competition: this.competition }),
+    });
     this.#db = new Database(path);
     this.#db.exec("PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;");
     const version =
@@ -49,6 +61,72 @@ export class Store {
  CREATE INDEX IF NOT EXISTS entity_query ON entities(scope,kind,club,round);
  PRAGMA user_version=1;`,
     );
+    if (this.competition === "top14") this.#migrateLegacyScopes(scope);
+  }
+
+  /** Old clients serialized configuration property order into the cache identity. */
+  #migrateLegacyScopes(scope: Scope) {
+    const aliases = this.#db.prepare<{ scope: string }>(
+      "SELECT DISTINCT scope FROM snapshots UNION SELECT DISTINCT scope FROM entities",
+    ).all().map((row) => row.scope).filter((key) => {
+      if (key === this.#scope) return false;
+      try {
+        const previous = JSON.parse(key) as Scope;
+        return (previous.competition === undefined ||
+          previous.competition === "top14") &&
+          new URL(previous.origin).origin === new URL(scope.origin).origin &&
+          previous.season === scope.season &&
+          previous.profile === scope.profile;
+      } catch {
+        return false;
+      }
+    });
+    if (!aliases.length) return;
+    this.#db.transaction(() => {
+      for (const alias of aliases) {
+        const rows = this.#db.prepare<Row>(
+          "SELECT * FROM snapshots WHERE scope=?",
+        ).all(alias);
+        for (const row of rows) {
+          const duplicate = this.#db.prepare<{ id: number }>(
+            "SELECT id FROM snapshots WHERE scope=? AND endpoint=? AND fetched_at=? AND hash=?",
+          ).get(this.#scope, row.endpoint, row.fetched_at, row.hash);
+          if (duplicate) {
+            // Keep immutable duplicate observations; normalized rows reference the canonical copy.
+            this.#db.exec(
+              "UPDATE entities SET snapshot_id=? WHERE scope=? AND snapshot_id=?",
+              duplicate.id,
+              alias,
+              row.id,
+            );
+          } else {
+            this.#db.exec(
+              "UPDATE snapshots SET scope=? WHERE id=?",
+              this.#scope,
+              row.id,
+            );
+          }
+        }
+        this.#db.exec(
+          `INSERT INTO entities(scope,endpoint,kind,key,club,round,price,payload,snapshot_id)
+           SELECT ?,endpoint,kind,key,club,round,price,payload,snapshot_id FROM entities WHERE scope=?
+           ON CONFLICT(scope,kind,key) DO UPDATE SET
+             endpoint=excluded.endpoint,club=excluded.club,round=excluded.round,
+             price=excluded.price,payload=excluded.payload,snapshot_id=excluded.snapshot_id
+           WHERE excluded.snapshot_id > entities.snapshot_id`,
+          this.#scope,
+          alias,
+        );
+        this.#db.exec("DELETE FROM entities WHERE scope=?", alias);
+      }
+      // A newer catalogue may have removed keys still present in an older alias.
+      this.#db.exec(
+        `DELETE FROM entities WHERE scope=? AND snapshot_id !=
+          (SELECT MAX(id) FROM snapshots WHERE scope=? AND endpoint=entities.endpoint)`,
+        this.#scope,
+        this.#scope,
+      );
+    })();
   }
   close() {
     this.#db.close();
