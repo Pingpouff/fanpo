@@ -35,3 +35,7 @@ draft release; publication remains manual.
 - GitHub CI owns the five-platform build and stores final archives/checksums for
   30 days as workflow artifacts; version tags on main additionally create a
   draft release. Pull requests exercise the release matrix before merge.
+
+- First GitHub matrix: Linux x64/ARM64 and macOS x64/ARM64 passed; Windows
+  exposed CRLF-dependent token-section extraction. Normalize kit input line
+  endings and add an injected-CRLF regression before rerunning CI.

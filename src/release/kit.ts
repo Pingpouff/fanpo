@@ -25,12 +25,13 @@ export const KIT_SOURCES = [
   "licenses/runtime.txt",
 ];
 
-export async function collectKit(): Promise<Record<string, string>> {
+export async function collectKit(
+  read: (path: string) => Promise<string> = (path) =>
+    Deno.readTextFile(new URL(`../../${path}`, import.meta.url)),
+): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
   for (const path of KIT_SOURCES) {
-    const text = await Deno.readTextFile(
-      new URL(`../../${path}`, import.meta.url),
-    );
+    const text = (await read(path)).replaceAll("\r\n", "\n");
     files[path] = text.replaceAll("deno task cli", "fanpo")
       .replaceAll("README.md#quick-start-from-source", "README.md");
   }

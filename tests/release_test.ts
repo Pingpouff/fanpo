@@ -148,3 +148,16 @@ Deno.test("standalone native override takes precedence over development LOCAL mo
     else Deno.env.set("DENO_SQLITE_LOCAL", previous);
   }
 });
+
+Deno.test("agent kit accepts Windows checkout line endings", async () => {
+  const { collectKit } = await import("../src/release/kit.ts");
+  const files = await collectKit((path: string) =>
+    Promise.resolve(
+      path === "docs/getting-started.md"
+        ? "# Setup\r\n\r\n## Get your token\r\n\r\nToken instructions\r\n\r\n## Next\r\n"
+        : "# Reference\r\n",
+    )
+  );
+  assert(files["docs/getting-started.md"].includes("Token instructions"));
+  assert(Object.values(files).every((text) => !text.includes("\r")));
+});
