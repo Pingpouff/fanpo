@@ -75,3 +75,7 @@ the rating; do not add extra bonuses. Missing role history leaves projections
 unresolved. Current standings describe context; historical replay uses earlier
 results only. Do not certify projections as measured outcomes or infer a
 guaranteed improvement from conditional scenarios.
+
+## Required CLI workflow
+
+Follow [the CLI advice workflow](../../../docs/fantasy-advice-workflow.md). Run compare for each complete recommended package and analyze lineup for the final proposal. Refresh stale roles/locks and rerun affected commands after evidence changes. Structural passes do not override an overall PROVISIONAL status. Conditional totals are not expected gains; missing values must never become zero. Do not certify a scratch-script result as CLI validation.

@@ -70,3 +70,7 @@ the rating; do not add extra bonuses. Missing role history leaves projections
 unresolved. Current standings describe context; historical replay uses earlier
 results only. Do not certify projections as measured outcomes or infer a
 guaranteed improvement from conditional scenarios.
+
+## Required CLI workflow
+
+For full team advice, follow [the CLI advice workflow](../../../docs/fantasy-advice-workflow.md) in the project root. Use data status/sync, analyze lineup, analyze matchups, data players, analyze player and compare. SQLite stores facts; do not export API responses as a parallel cache or use direct SQL/scratch scripts to reproduce scores. Report a precise capability gap before introducing a bounded fallback.

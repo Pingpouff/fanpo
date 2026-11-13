@@ -1,6 +1,9 @@
 import { jsonBytes } from "../../operations/metadata.ts";
 import type { Player } from "../../api/joueurs/types.ts";
 import { renderAnalysis } from "./output.ts";
+import { renderPlayers } from "../joueurs/output.ts";
+import type { PlayerFilters } from "../../operations/player-filters.ts";
+import { heading, status, tone } from "../shared/colors.ts";
 import {
   type CommandContext,
   createCommand,
@@ -8,7 +11,8 @@ import {
 } from "../shared/command.ts";
 import type { Lineup } from "../../analysis/lineup.ts";
 import type { AdviceRequest } from "../../operations/advice.ts";
-interface Options {
+import { parseCandidate } from "../../analysis/candidates.ts";
+interface Options extends PlayerFilters {
   db?: string;
   season?: string;
   profile?: string;
@@ -19,6 +23,7 @@ interface Options {
   composition?: number;
   lineup?: string;
   alternative?: string;
+  candidate?: string[];
 }
 function season() {
   const now = new Date();
@@ -82,10 +87,25 @@ export function analysisCommands(
   context: CommandContext,
 ) {
   const execute = async (
-    kind: AdviceRequest["kind"] | "status",
+    kind: AdviceRequest["kind"] | "status" | "catalogue",
     o: Options,
     ids: number[] = [],
   ) => {
+    const candidates = (o.candidate ?? []).map(parseCandidate);
+    if (o.alternative && candidates.length) {
+      throw new Error("Use either --alternative or --candidate.");
+    }
+    if (new Set(candidates.map((c) => c.name)).size !== candidates.length) {
+      throw new Error("Duplicate candidate name.");
+    }
+    if (kind === "compare" && !o.alternative && !candidates.length) {
+      throw new Error("Supply --alternative or --candidate.");
+    }
+    if (kind === "lineup" && candidates.length > 1) {
+      throw new Error(
+        "Lineup validation accepts one candidate; use compare for multiple candidates.",
+      );
+    }
     // Lazy native loading keeps ordinary API commands and all help permission-free.
     if (!Deno.env.get("DENO_SQLITE_PATH")) {
       throw new Error(
@@ -96,7 +116,7 @@ export function analysisCommands(
       "https://fantasy.poneeey.fr";
     const origin = new URL(o.origin ?? configuredOrigin).origin;
     if (
-      !o.offline && kind !== "status" &&
+      !o.offline && kind !== "status" && kind !== "catalogue" &&
       origin !== new URL(configuredOrigin).origin
     ) {
       throw new Error(
@@ -114,7 +134,38 @@ export function analysisCommands(
     });
     try {
       let value: unknown;
-      if (kind === "status") {
+      if (kind === "catalogue") {
+        const { readCatalogue } = await import("../../operations/catalogue.ts");
+        const catalogue = readCatalogue(store, o);
+        const snapshot = store.read("/api/joueurs")!;
+        context.recordDataAccess?.({
+          endpoint: snapshot.endpoint,
+          source: "cache",
+          cacheStatus: catalogue.evidence.stale ? "stale" : "fresh",
+          fetchedAt: snapshot.fetchedAt,
+          snapshotId: snapshot.id,
+          storage: "reused",
+          storedBytes: 0,
+          cacheBytes: jsonBytes(snapshot.data),
+        });
+        context.setOutput(
+          o.json ? JSON.stringify(catalogue, null, 2) : [
+            heading(`Cached players | Round ${catalogue.round}`),
+            `Catalogue: ${
+              status(catalogue.evidence.stale ? "Stale" : "Fresh")
+            } | Snapshot #${snapshot.id} | Fetched: ${snapshot.fetchedAt}`,
+            ...catalogue.warnings.map((w) =>
+              `${tone("Warning:", "caution")} ${w}`
+            ),
+            renderPlayers({
+              ...(snapshot
+                .data as import("../../api/joueurs/types.ts").PlayersResponse),
+              joueurs: catalogue.players,
+            }),
+          ].join("\n"),
+        );
+        return;
+      } else if (kind === "status") {
         const { stale } = await import("../../operations/data.ts");
         const round =
           store.read<{ numero: number }>("/api/journees/cible")?.data.numero ??
@@ -151,6 +202,7 @@ export function analysisCommands(
           kind,
           ids,
           compositionId: o.composition,
+          candidates,
           lineup: o.lineup ? await readLineup(o.lineup) : undefined,
           alternative: o.alternative
             ? await readLineup(o.alternative)
@@ -192,6 +244,34 @@ export function analysisCommands(
   root.command(
     "data",
     groupCommand("Inspect locally stored sources and their freshness.", context)
+      .command(
+        "players",
+        options().description(
+          "Find players in the cached catalogue; never requests the API or credentials.\nFilters combine with AND and include secondary/tertiary positions. --available excludes flagged unavailable players; it does not confirm selection.\nFreshness and snapshot evidence are reported. Run sync online if data is missing/stale. --offline, --force and --composition have no effect.",
+        )
+          .example(
+            "Cached candidates",
+            "deno task cli data players --position TL --available",
+          )
+          .example(
+            "Find a cached player",
+            "deno task cli data players --name Rabut",
+          )
+          .option("--club <code:filter>", "Exact club code (case insensitive).")
+          .option(
+            "--position <code:filter>",
+            "Primary, secondary or tertiary position, e.g. PIL or TL.",
+          )
+          .option(
+            "--name <text:filter>",
+            "Full-name substring (case insensitive).",
+          )
+          .option(
+            "--available",
+            "Exclude flagged unavailable players; selection remains unconfirmed.",
+          )
+          .action((o) => execute("catalogue", o)),
+      )
       .command(
         "status",
         options().description(
@@ -246,13 +326,19 @@ export function analysisCommands(
           .option(
             "--lineup <path:string>",
             "Lineup JSON file; defaults to current API composition",
+          ).option(
+            "--candidate <proposal:string>",
+            "Validate swaps against the baseline: NAME:SLOT=PLAYER_ID[,SLOT=PLAYER_ID]. Retains captain/impact slots.",
+            { collect: true },
           ).action((o) => execute("lineup", o)),
       ),
   );
   root.command(
     "compare",
     options().description(
-      "Compare a proposed lineup to your current team, or compare two files.\n" +
+      "Compare proposed lineups to your current team or a --lineup baseline file.\n" +
+        "Use --alternative FILE or repeat --candidate 'NAME:SLOT=PLAYER_ID[,SLOT=PLAYER_ID]'.\n" +
+        "Candidates independently apply swaps to the baseline, retaining captain/impact slots; data refreshes once for all candidates.\n" +
         "Shows legality, budget and projected points changes. Unresolved totals do not imply a guaranteed improvement.\n" +
         "Files use 1-based slots [{slot,playerId}], captainSlot (1-15), impactSlot (16-17), with all 17 selections.\n" +
         "Put files under .data/. The selected API composition supplies salary cap, club limit and locks.",
@@ -260,6 +346,10 @@ export function analysisCommands(
       "Proposed vs current team",
       "deno task cli compare --alternative .data/proposed.json",
     )
+      .example(
+        "Compare swap packages without files",
+        "deno task cli compare --candidate 'Manu:11=883' --candidate 'Manu+Brau:11=883,12=834'",
+      )
       .example(
         "Two saved teams",
         "deno task cli compare --lineup .data/before.json --alternative .data/after.json --offline",
@@ -269,8 +359,11 @@ export function analysisCommands(
         "Before lineup JSON; omit to use current team.",
       ).option(
         "--alternative <path:string>",
-        "Proposed lineup JSON file (required).",
-        { required: true },
+        "Complete proposed lineup JSON file; exclusive with --candidate.",
+      ).option(
+        "--candidate <proposal:string>",
+        "Named swaps: NAME:SLOT=PLAYER_ID[,SLOT=PLAYER_ID]. Repeat for independent alternatives. Slots 1-17; names unique.",
+        { collect: true },
       ).action((o) => execute("compare", o)),
   );
   root.reset();

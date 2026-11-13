@@ -5,6 +5,11 @@ teams and players, cache data locally, and compare explainable Fantasy Rugby
 projections. Commands show readable tables by default; add `--json` for scripts.
 No build step.
 
+For team advice, follow the
+[Fantasy advice workflow](docs/fantasy-advice-workflow.md). Use the cached
+analysis commands for scoring and `compare` for full proposals; raw API commands
+inspect live responses and do not populate the analysis cache.
+
 ## Setup
 
 Use Deno 2.9 or later.
@@ -87,6 +92,7 @@ copyable examples, e.g. `deno task cli analyze lineup --help`.
 | `top14 matches`              | Season fixtures and results, home team first        | `--round N` filters one round                   |
 | `sync [ids...]`              | Cache squad/context plus optional candidate fiches  | `--force`, `--composition`                      |
 | `data status`                | Stored sources, timestamps and Fresh/Stale state    | Scope options below; never fetches              |
+| `data players`               | Filter cached players with snapshot/freshness info  | `--club`, `--position`, `--name`, `--available` |
 | `analyze player <ids...>`    | Compare player projections with matchup influence   | `--offline`, `--force`                          |
 | `analyze matchups`           | Target-round margins and win/domination chances     | `--offline`, `--force`                          |
 | `analyze lineup`             | Team legality, budget and projected points          | `--lineup FILE`, `--composition`                |
@@ -146,7 +152,8 @@ conventions.
 
 ### Cached command options
 
-These options apply to `sync`, `data status`, `analyze ...` and `compare`:
+These options apply to `sync`, `data status`, `data players`, `analyze ...` and
+`compare`:
 
 | Option             | Meaning / default                                                                                             |
 | ------------------ | ------------------------------------------------------------------------------------------------------------- |
@@ -159,13 +166,28 @@ These options apply to `sync`, `data status`, `analyze ...` and `compare`:
 | `--composition ID` | Team resource for `sync`, `analyze lineup` and `compare`; `1`. Unused for player/matchup analysis.            |
 | `--json`           | Structured results with complete evidence and warnings.                                                       |
 
-`data status` is always local: `--offline`, `--force` and `--composition` have
-no effect there. `sync` refreshes missing/stale sources by default, not
-necessarily every source; use `--force` for a full requested refresh. Run
-`deno task
-sqlite:setup` before any cached command. Custom paths outside
-`.data/` require a direct `deno run` invocation with suitable permissions; see
-native setup below.
+`data status` and `data players` are always local: `--offline`, `--force` and
+`--composition` have no effect there. `data players` uses the selected SQLite
+scope and never requests credentials or the API. It combines filters with AND,
+including secondary/tertiary positions. `--available` excludes flagged
+unavailable players; it does not confirm selection. Missing catalogue data asks
+you to run `sync`; stale or unknown target-round evidence is reported with
+warnings. Its `--json` result contains `round`, `players`, `evidence` and
+`warnings` (with the usual `{data,metadata}` wrapper under `--debug`). Human
+output includes the snapshot ID and fetch time, followed by the colored player
+table.
+
+```sh
+deno task cli data players --position TL --available
+deno task cli data players --name Rabut --no-color
+deno task cli data players --club USAP --json --debug
+```
+
+`sync` refreshes missing/stale sources by default, not necessarily every source;
+use `--force` for a full requested refresh. Run `deno task
+sqlite:setup` before
+any cached command. Custom paths outside `.data/` require a direct `deno run`
+invocation with suitable permissions; see native setup below.
 
 ### Request metadata (`--debug`)
 
@@ -633,6 +655,29 @@ deno task cli analyze lineup --lineup .data/proposed.json
 deno task cli compare --alternative .data/proposed.json
 deno task cli compare --lineup .data/before.json --alternative .data/after.json
 ```
+
+Compare named swap packages directly, without creating lineup files or using
+external scripts:
+
+```sh
+deno task cli compare --candidate 'Manu:11=883' --candidate 'Manu+Brau:11=883,12=834'
+deno task cli analyze lineup --candidate 'Manu:11=883'
+```
+
+Each `--candidate` uses `NAME:SLOT=PLAYER_ID[,SLOT=PLAYER_ID]`. Names must be
+unique, slots are 1–17, and player IDs must be positive integers. Each package
+independently starts from your current roster (or `--lineup FILE`), retaining
+captain and impact slots. Use a complete `--alternative FILE` to change these
+roles; it cannot be combined with `--candidate`. No live roster is modified.
+
+Candidates share one context refresh and fetch each required player sheet once.
+Readable output compares costs, remaining budget, validation and the forecasts
+for changed players. Invalid packages remain visible with their errors.
+Unresolved team totals and gains remain unresolved. `--json` returns
+`result.before` and `result.alternatives`, including each complete proposed
+`lineup`, its analysis and changes; `--debug --json` adds the usual metadata.
+Validate one package with `analyze lineup --candidate`; use `--offline` on
+either command for stored evidence with freshness warnings.
 
 Budget and club constraints come from the selected API composition
 (`--composition`, defaults to 1). Effective salary cap is `equipe.budget`; `cap`

@@ -19,6 +19,10 @@ import {
 } from "../analysis/player.ts";
 import { type Lineup, validateLineup } from "../analysis/lineup.ts";
 import { MODEL } from "../analysis/model.ts";
+import {
+  candidateLineup,
+  type LineupCandidate,
+} from "../analysis/candidates.ts";
 import { acquire, type RefreshOptions } from "./data.ts";
 export interface AdviceRequest extends RefreshOptions {
   kind: "sync" | "player" | "matchups" | "lineup" | "compare";
@@ -26,6 +30,7 @@ export interface AdviceRequest extends RefreshOptions {
   compositionId?: number;
   lineup?: Lineup;
   alternative?: Lineup;
+  candidates?: LineupCandidate[];
 }
 export function currentLineup(c: CompositionResponse): Lineup {
   if (!c.compo) {
@@ -43,6 +48,18 @@ export async function advise(
   getClient: () => FantasyClient,
   request: AdviceRequest,
 ) {
+  const candidates = request.candidates ?? [];
+  if (request.alternative && candidates.length) {
+    throw new Error("Use either --alternative or --candidate.");
+  }
+  if (new Set(candidates.map((c) => c.name)).size !== candidates.length) {
+    throw new Error("Duplicate candidate name.");
+  }
+  if (request.kind === "lineup" && candidates.length > 1) {
+    throw new Error(
+      "Lineup validation accepts one candidate; use compare for multiple candidates.",
+    );
+  }
   const roundEndpoint = "/api/journees/cible";
   const preflight = await acquire(
     store,
@@ -76,11 +93,19 @@ export async function advise(
   if (needsTeam && !lineup && composition?.compo) {
     lineup = currentLineup(composition);
   }
+  if (candidates.length && !lineup) {
+    throw new Error("No baseline lineup available.");
+  }
+  const alternatives = candidates.map((candidate) => ({
+    name: candidate.name,
+    lineup: candidateLineup(lineup!, candidate),
+  }));
   const ids = [
     ...new Set([
       ...(request.ids ?? []),
       ...(lineup?.slots.map((s) => s.playerId) ?? []),
       ...(request.alternative?.slots.map((s) => s.playerId) ?? []),
+      ...alternatives.flatMap((a) => a.lineup.slots.map((s) => s.playerId)),
     ]),
   ];
   if (request.kind === "player" && !ids.length) {
@@ -271,27 +296,37 @@ export async function advise(
   if (request.kind === "player") result = players;
   if (request.kind === "lineup") {
     if (!lineup) throw new Error("No lineup available");
-    result = analyzeLineup(lineup);
+    result = analyzeLineup(alternatives[0]?.lineup ?? lineup);
   }
   if (request.kind === "compare") {
-    if (!lineup || !request.alternative) {
+    if (!lineup || (!request.alternative && !alternatives.length)) {
       throw new Error("Compare requires two lineups");
     }
-    const before = analyzeLineup(lineup),
-      after = analyzeLineup(request.alternative);
-    result = {
-      before,
-      after,
-      expectedDelta: before.expected === null || after.expected === null
-        ? null
-        : after.expected - before.expected,
-      costDelta: after.validation.cost - before.validation.cost,
-      changes: request.alternative.slots.filter((s) =>
-        !lineup!.slots.some((o) =>
-          o.slot === s.slot && o.playerId === s.playerId
-        )
-      ),
+    const before = analyzeLineup(lineup);
+    const comparison = (proposal: Lineup) => {
+      const after = analyzeLineup(proposal);
+      return {
+        after,
+        expectedDelta: before.expected === null || after.expected === null
+          ? null
+          : after.expected - before.expected,
+        costDelta: after.validation.cost - before.validation.cost,
+        changes: proposal.slots.filter((s) =>
+          !lineup!.slots.some((o) =>
+            o.slot === s.slot && o.playerId === s.playerId
+          )
+        ),
+      };
     };
+    result = alternatives.length
+      ? {
+        before,
+        alternatives: alternatives.map((a) => ({
+          ...a,
+          ...comparison(a.lineup),
+        })),
+      }
+      : { before, ...comparison(request.alternative!) };
   }
   return {
     model: MODEL,

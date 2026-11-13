@@ -108,3 +108,7 @@ the rating; do not add extra bonuses. Missing role history leaves projections
 unresolved. Current standings describe context; historical replay uses earlier
 results only. Do not certify projections as measured outcomes or infer a
 guaranteed improvement from conditional scenarios.
+
+## Required CLI workflow
+
+Follow [the CLI advice workflow](../../../docs/fantasy-advice-workflow.md). Use analyze player with current and alternative IDs before recommending replacements, and compare with a complete local Lineup input for every recommended package, including captain/impact variants. Keep incompatible proposals separate. Cite command results and evidence; unresolved expectedDelta stays unresolved. Never substitute a scratch scoring script for these commands.

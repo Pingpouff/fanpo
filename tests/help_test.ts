@@ -20,6 +20,7 @@ Deno.test("every leaf help has a useful description and an executable example wi
       ["top14", "matches"],
       ["sync"],
       ["data", "status"],
+      ["data", "players"],
       ["analyze", "player"],
       ["analyze", "matchups"],
       ["analyze", "lineup"],

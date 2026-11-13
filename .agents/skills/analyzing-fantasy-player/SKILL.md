@@ -88,3 +88,7 @@ the rating; do not add extra bonuses. Missing role history leaves projections
 unresolved. Current standings describe context; historical replay uses earlier
 results only. Do not certify projections as measured outcomes or infer a
 guaranteed improvement from conditional scenarios.
+
+## Required CLI workflow
+
+Use analyze player <current IDs and alternative IDs> for projections and role comparisons, following [the CLI advice workflow](../../../docs/fantasy-advice-workflow.md). This command acquires missing/stale inputs itself. Use data players for cached discovery. Inspect structured analysis evidence in memory before requesting raw player --detailed for missing statistics. Do not recompute projections from SQL or add stat bonuses to an existing rating.

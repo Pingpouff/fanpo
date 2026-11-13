@@ -309,42 +309,122 @@ export function renderAnalysis(
     lines.push(...lineup(value.result as LineupView, labels));
   }
   if (kind === "compare") {
-    const result = value.result as {
+    const batch = value.result as {
       before: LineupView;
-      after: LineupView;
-      expectedDelta: number | null;
-      costDelta: number;
-      changes: { slot: number; playerId: number }[];
+      alternatives?: {
+        name: string;
+        after: LineupView;
+        expectedDelta: number | null;
+        costDelta: number;
+        changes: { slot: number; playerId: number }[];
+      }[];
     };
-    lines.push(
-      `Expected points change: ${
-        signed(result.expectedDelta, number(result.expectedDelta))
-      }`,
-      `Cost change: ${
-        signed(
-          result.costDelta,
-          `${result.costDelta > 0 ? "+" : ""}${money(result.costDelta)}`,
-          true,
-        )
-      }`,
-      "",
-      heading("Before"),
-      ...lineup(result.before, labels),
-      "",
-      heading("After"),
-      ...lineup(result.after, labels),
-      "",
-      result.changes.length
-        ? renderTable([
-          ["Changed slot", "New player"],
-          ...result.changes.map(
-            (
-              s,
-            ) => [String(s.slot), labels?.get(s.playerId) ?? `#${s.playerId}`],
+    if (batch.alternatives) {
+      lines.push(
+        `Current cost: ${money(batch.before.validation.cost)} | Remaining: ${
+          money(batch.before.validation.remaining)
+        }`,
+        "Forecasts include real roles and matchup influence. Unresolved totals remain unresolved; alternatives are independent.",
+        renderTable([
+          [
+            "Candidate",
+            "Validation",
+            "Cost",
+            "Remaining",
+            "Cost change",
+            "Expected change",
+          ],
+          ...batch.alternatives.map((a) => [
+            a.name,
+            status(a.after.validation.status),
+            money(a.after.validation.cost),
+            signed(
+              a.after.validation.remaining,
+              money(a.after.validation.remaining),
+            ),
+            signed(a.costDelta, money(a.costDelta), true),
+            signed(a.expectedDelta, number(a.expectedDelta)),
+          ]),
+        ]),
+      );
+      for (const a of batch.alternatives) {
+        lines.push(
+          "",
+          heading(a.name),
+          renderTable([
+            [
+              "Slot",
+              "Before",
+              "After",
+              "Real role",
+              "Before forecast",
+              "After forecast",
+            ],
+            ...a.changes.map((change) => {
+              const old = batch.before.slots.find((s) =>
+                s.slot === change.slot
+              );
+              const next = a.after.slots.find((s) => s.slot === change.slot)!;
+              return [
+                String(change.slot),
+                old
+                  ? labels?.get(old.playerId) ?? `#${old.playerId}`
+                  : "Missing",
+                labels?.get(change.playerId) ?? `#${change.playerId}`,
+                role(next.status),
+                colorRating(old?.expected, number(old?.expected)),
+                colorRating(next.expected, number(next.expected)),
+              ];
+            }),
+          ]),
+          ...warnings(a.after.validation.errors, "Error"),
+          ...warnings([...a.after.validation.warnings, ...a.after.warnings]),
+          ...a.after.slots.flatMap((s) =>
+            warnings(s.warnings, `Slot ${s.slot} / player ${s.playerId}`)
           ),
-        ])
-        : tone("No player changes.", "muted"),
-    );
+        );
+      }
+    } else {
+      const result = value.result as {
+        before: LineupView;
+        after: LineupView;
+        expectedDelta: number | null;
+        costDelta: number;
+        changes: { slot: number; playerId: number }[];
+      };
+      lines.push(
+        `Expected points change: ${
+          signed(result.expectedDelta, number(result.expectedDelta))
+        }`,
+        `Cost change: ${
+          signed(
+            result.costDelta,
+            `${result.costDelta > 0 ? "+" : ""}${money(result.costDelta)}`,
+            true,
+          )
+        }`,
+        "",
+        heading("Before"),
+        ...lineup(result.before, labels),
+        "",
+        heading("After"),
+        ...lineup(result.after, labels),
+        "",
+        result.changes.length
+          ? renderTable([
+            ["Changed slot", "New player"],
+            ...result.changes.map(
+              (
+                s,
+              ) => [
+                String(s.slot),
+                labels?.get(s.playerId) ?? `#${s.playerId}`,
+              ],
+            ),
+          ])
+          : tone("No player changes.", "muted"),
+      );
+    }
   }
   if (value.evidence.length) {
     lines.push(
