@@ -170,6 +170,10 @@ Fanpo keeps those limitations visible alongside its numbers. See
 
 ## Development
 
+`main` contains stable code; ongoing work integrates through `develop` using
+feature pull requests. See the
+[branch workflow](CONTRIBUTING.md#branch-workflow).
+
 ```sh
 deno task sqlite:setup
 deno task check

@@ -34,6 +34,10 @@ deno task cli analyze lineup --offline --json
 
 ## Development
 
+- Use `develop` as the integration branch. Start feature/fix branches from it
+  and target pull requests to `develop`; `main` is the stable default branch.
+  Follow the release and hotfix workflow in `CONTRIBUTING.md`. Do not force-push
+  either long-lived branch.
 - Use the existing Deno/TypeScript toolchain. Read the relevant Deno skill under
   `.agents/skills/` when working on runtime code.
 - Keep API requests/models in `src/api`, persistence in `src/data`, pure scoring
