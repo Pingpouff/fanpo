@@ -1,4 +1,12 @@
 .env
 .env.*
+!.env.example
 coverage/
 .data/
+tmp/
+.aws/
+.codex/
+.DS_Store
+# Personal analyses stay local; reusable workflows and rules are public.
+docs/fantasy-review-*.md
+docs/fantasy-team-advice-*.md

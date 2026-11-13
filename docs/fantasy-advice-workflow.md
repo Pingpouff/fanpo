@@ -10,10 +10,10 @@ Read the relevant Fantasy skills and `regles_fantasy_rugby.md`. Keep `--db`,
 `--season`, `--profile`, `--origin` and `--composition` consistent throughout
 the session. Inspect the target round before reusing old reports or proposals.
 Top 14 is the default. For Nations Championship, add `--nationchampionship`
-consistently to every command, including offline reads. Each competition has
-its own cache; the international default composition is discovered from your
-normal leagues. An explicit `--composition` must belong to that competition.
-Use `games` to inspect available competitions, and `competition matches` or
+consistently to every command, including offline reads. Each competition has its
+own cache; the international default composition is discovered from your normal
+leagues. An explicit `--composition` must belong to that competition. Use
+`games` to inspect available competitions, and `competition matches` or
 `competition standings` for neutral command names. International forecasts
 remain exploratory and must retain their validation warning.
 

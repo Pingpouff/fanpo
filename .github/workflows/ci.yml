@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, lint, types and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.x
+      - name: Install locked dependencies
+        run: deno install --frozen-lockfile
+      - name: Set up SQLite
+        run: deno task sqlite:setup
+      - name: Check formatting, lint and types
+        run: deno task check
+      - name: Run tests without production credentials
+        run: deno task test

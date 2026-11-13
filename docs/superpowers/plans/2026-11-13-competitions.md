@@ -77,9 +77,9 @@ Files: README.md, docs/fantasy-advice-workflow.md.
 - Final verification: deno task check PASS; deno task test 123 passed, 0 failed;
   git diff --check PASS.
 - Live read-only checks: default Top 14 J10; NC J5, 10 announced nations,
-  230 players; default NC composition resolves league 1331, budget 11 M,
+  230 players; default NC composition resolves the account’s international league, budget 11 M,
   nation limit 4. No live team writes.
 - Reverted only 18 incorrect NC observations created during the initial smoke
   test before the league guard. Original Top 14 observations and correct NC
-  snapshots retained; final NC scope has 23 sources and only composition 1331.
+  snapshots retained; final NC scope has 23 sources and only the correct international composition.
 - No automatic commit or branch integration.

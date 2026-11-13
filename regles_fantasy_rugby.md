@@ -54,11 +54,11 @@ Le salary cap initial est de **11 M**, mais il évolue selon les performances et
 la valorisation des joueurs choisis. La somme des valeurs des 17 joueurs ne doit
 pas dépasser le **salary cap actuel de l’équipe**, et non le montant initial.
 
-Correction confirmée par l’utilisateur le 9 octobre 2026 : le salary cap actuel
-de l’Équipe de Beto est de **11,15 M**. Ce montant est un état daté, à
-actualiser à chaque analyse. Ne pas traiter le champ API générique `cap` comme
-le plafond effectif de cette équipe lorsqu’il diffère du salary cap actuel
-confirmé.
+Le plafond effectif vient de **`equipe.budget`** dans la composition
+sélectionnée. Ne pas traiter le champ API générique `cap` comme le plafond
+effectif lorsqu’il diffère de ce budget. Les montants d’une analyse précédente
+ne constituent pas une valeur actuelle : vérifier à nouveau le budget à chaque
+journée et pour chaque compétition.
 
 Le budget doit donc être considéré comme une ressource à optimiser : le joueur
 le plus cher n’est pas nécessairement le meilleur choix si un joueur moins cher

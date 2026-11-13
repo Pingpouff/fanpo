@@ -18,7 +18,18 @@
       "deno.json",
       "README.md",
       "docs/plans",
-      "regles_fantasy_rugby.md"
+      "regles_fantasy_rugby.md",
+      "AGENTS.md",
+      "CONTRIBUTING.md",
+      "THIRD_PARTY_NOTICES.md",
+      "docs/getting-started.md",
+      "docs/cli.md",
+      "docs/agents.md",
+      "docs/api.md",
+      "docs/analysis.md",
+      "docs/development.md",
+      "docs/fantasy-advice-workflow.md",
+      ".github"
     ]
   },
   "lint": {
