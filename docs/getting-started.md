@@ -1,5 +1,7 @@
 # Getting started
 
+For installation without Deno, use the [standalone executable](releases.md).
+
 [README](../README.md) · [CLI reference](cli.md) · [Agent guide](agents.md)
 
 ## Requirements

@@ -1,0 +1,140 @@
+name: Release executable
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "src/**"
+      - "scripts/release/**"
+      - ".github/workflows/release.yml"
+      - "deno.*"
+      - ".agents/skills/**"
+      - "docs/**"
+      - "regles_fantasy_rugby.md"
+      - "LICENSE"
+      - "THIRD_PARTY_NOTICES.md"
+      - "licenses/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - name: Validate release tag and stable ancestry
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(deno eval 'import { VERSION } from "./src/release/version.ts"; console.log(VERSION)')
+          test "$RELEASE_TAG" = "v$version"
+          git merge-base --is-ancestor HEAD origin/main
+      - run: deno install --frozen-lockfile
+      - run: deno task sqlite:setup
+      - run: deno task check
+      - run: deno task test
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            container: ubuntu:22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            container: ubuntu:22.04
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container || '' }}
+    timeout-minutes: 25
+    steps:
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git unzip build-essential
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - run: deno install --frozen-lockfile
+      - name: Verify native target
+        env:
+          EXPECTED_TARGET: ${{ matrix.target }}
+        run: deno eval 'if (Deno.build.target !== Deno.env.get("EXPECTED_TARGET")) throw new Error("Unexpected runner architecture")'
+      - run: deno task build
+      - run: deno task release:smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fanpo-${{ matrix.target }}
+          path: tmp/release/bin/${{ matrix.target }}/fanpo*
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - uses: actions/download-artifact@v4
+        with:
+          path: tmp/release/downloads
+          pattern: fanpo-*
+      - name: Restore target directories
+        run: |
+          mkdir -p tmp/release/bin
+          for directory in tmp/release/downloads/fanpo-*; do
+            target="${directory##*/fanpo-}"
+            mv "$directory" "tmp/release/bin/$target"
+          done
+      - run: deno task release:kit
+      - run: python3 scripts/release/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fanpo-release-assets
+          path: tmp/release/dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-draft:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: fanpo-release-assets
+          path: tmp/release/dist
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" tmp/release/dist/* --verify-tag --draft --title "Fanpo $RELEASE_TAG" --generate-notes

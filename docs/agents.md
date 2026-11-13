@@ -1,6 +1,6 @@
 # Fanpo for agents
 
-[Quick start](../README.md#quick-start) · [CLI reference](cli.md) ·
+[Quick start](../README.md#quick-start-from-source) · [CLI reference](cli.md) ·
 [Detailed advice workflow](fantasy-advice-workflow.md)
 
 Fanpo is a CLI-first tool designed to be used by agents. Any assistant that can
@@ -20,6 +20,21 @@ human. No provider-specific SDK or LLM integration is required by Fanpo.
 Fanpo does not embed an LLM or search automatically for an optimal squad. It
 also has no CLI command to submit a team to the website. Analysis can update
 local facts and files; the user's live team stays unchanged.
+
+## Use the standalone executable
+
+The [standalone release](releases.md) includes the eight Fantasy Rugby skills,
+rules and required references. Export them without credentials or network:
+
+```sh
+fanpo skills export --output ./fanpo-agent-kit
+```
+
+Ask your agent to read the exported `AGENTS.md` and keep the directory structure
+intact. No source checkout is required. The same kit is available as a release
+ZIP. It matches the executable version; export again to a new directory after
+upgrading. In the workflows below, replace `deno task cli` with `fanpo` when
+using the executable. Automatic integration into agent configuration is manual.
 
 ## Give an agent the repository
 
@@ -142,6 +157,8 @@ cite source IDs/timestamps, target round, model version and the exact commands
 used. The full output contract is in the
 [advice workflow](fantasy-advice-workflow.md#final-validation-and-report).
 
-The user supplies a token in local `.env`. Never read it into a prompt, print
-it, or add it to a report. Use the configured CLI; diagnose authentication by
-HTTP status. Request metadata deliberately excludes tokens and request headers.
+The user supplies a token through the process environment or the executable’s
+per-user configuration file (source checkouts can use local `.env`). Never read
+it into a prompt, print it, or add it to a report. Use the configured CLI;
+diagnose authentication by HTTP status. Request metadata deliberately excludes
+tokens and request headers.

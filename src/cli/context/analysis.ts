@@ -32,12 +32,12 @@ function season() {
     : now.getUTCFullYear() - 1;
   return `${start}-${String(start + 1).slice(-2)}`;
 }
-function options() {
+function options(defaultDatabase = ".data/fanpo.sqlite") {
   return createCommand().option(
     "--db <path:string>",
-    "Local database path; task permissions cover .data/.",
+    "Local database path (source task permissions cover .data/).",
     {
-      default: ".data/fanpo.sqlite",
+      default: defaultDatabase,
     },
   ).option(
     "--season <season:string>",
@@ -106,6 +106,7 @@ export function analysisCommands(
       );
     }
     // Lazy native loading keeps ordinary API commands and all help permission-free.
+    await context.prepareSqlite?.();
     if (!Deno.env.get("DENO_SQLITE_PATH")) {
       throw new Error(
         "Set DENO_SQLITE_PATH to your SQLite library, or use deno task cli after deno task sqlite:setup.",
@@ -229,7 +230,7 @@ export function analysisCommands(
   };
   root.command(
     "sync",
-    options().description(
+    options(context.defaultDatabase).description(
       "Cache context, your current squad and any extra candidate player IDs.\n" +
         "Reuses fresh data; --force refreshes it. Failures keep previous data and report warnings.\n" +
         "First run: deno task sqlite:setup. Online refresh requires FANTASY_TOKEN.",
@@ -247,7 +248,7 @@ export function analysisCommands(
     groupCommand("Inspect locally stored sources and their freshness.", context)
       .command(
         "players",
-        options().description(
+        options(context.defaultDatabase).description(
           "Find players in the cached catalogue; never requests the API or credentials.\nFilters combine with AND and include secondary/tertiary positions. --available excludes flagged unavailable players; it does not confirm selection.\nFreshness and snapshot evidence are reported. Run sync online if data is missing/stale. --offline, --force and --composition have no effect.",
         )
           .example(
@@ -275,7 +276,7 @@ export function analysisCommands(
       )
       .command(
         "status",
-        options().description(
+        options(context.defaultDatabase).description(
           "List cached sources, fetch times and Fresh/Stale status; never requests the API.\nUse sync to refresh. --force, --offline and --composition do not affect this read-only command.",
         )
           .example("Cache freshness", "deno task cli data status")
@@ -294,7 +295,7 @@ export function analysisCommands(
     )
       .command(
         "player",
-        options().description(
+        options(context.defaultDatabase).description(
           "Compare projected ratings for player IDs, with price, real role and matchup influence.\nStarter/substitute scenarios are conditional until teamsheets are known. Unresolved means missing evidence.\nFirst run deno task sqlite:setup; find IDs with players --name. --composition is unused here.",
         )
           .example("Compare candidates", "deno task cli analyze player 825 990")
@@ -308,7 +309,7 @@ export function analysisCommands(
       )
       .command(
         "matchups",
-        options().description(
+        options(context.defaultDatabase).description(
           "Forecast target-round match margins and home-team win/draw/loss chances.\nDomination = P(win by 20+) - P(lose by 20+); at least 20 replay errors are needed.\nUnresolved probabilities use a neutral player multiplier. --composition is unused here.",
         )
           .example("Upcoming matchups", "deno task cli analyze matchups")
@@ -316,7 +317,7 @@ export function analysisCommands(
       )
       .command(
         "lineup",
-        options().description(
+        options(context.defaultDatabase).description(
           "Check lineup legality, effective budget and projected Fantasy points.\nDefaults to your current team. VALID/INVALID checks structure; PROVISIONAL signals unresolved evidence.\nLineup files use 1-based slots [{slot,playerId}], captainSlot (1-15), impactSlot (16-17); include all 17 slots.\nStore files under .data/ for the default task permissions. Only normal format is supported.",
         )
           .example("Current team advice", "deno task cli analyze lineup")
@@ -336,7 +337,7 @@ export function analysisCommands(
   );
   root.command(
     "compare",
-    options().description(
+    options(context.defaultDatabase).description(
       "Compare proposed lineups to your current team or a --lineup baseline file.\n" +
         "Use --alternative FILE or repeat --candidate 'NAME:SLOT=PLAYER_ID[,SLOT=PLAYER_ID]'.\n" +
         "Candidates independently apply swaps to the baseline, retaining captain/impact slots; data refreshes once for all candidates.\n" +

@@ -1,11 +1,14 @@
 {
   "tasks": {
-    "cli": "DENO_SQLITE_PATH=.data/sqlite3 deno run --env-file=.env --no-prompt --allow-env=FANTASY_TOKEN,FANTASY_API_URL,DENO_SQLITE_PATH,DENO_SQLITE_LOCAL --allow-net=fantasy.poneeey.fr:443 --allow-read=.data --allow-write=.data --allow-ffi src/cli.ts",
+    "cli": "DENO_SQLITE_PATH=.data/sqlite3 deno run --env-file=.env --no-prompt --allow-env=FANTASY_TOKEN,FANTASY_API_URL,DENO_SQLITE_PATH,DENO_SQLITE_LOCAL --allow-net=fantasy.poneeey.fr:443 --allow-read=.data,.agents/skills,regles_fantasy_rugby.md,docs/cli.md,docs/releases.md,docs/getting-started.md,docs/agents.md,docs/analysis.md,docs/fantasy-advice-workflow.md,LICENSE,THIRD_PARTY_NOTICES.md,licenses/runtime.txt --allow-write=.data --allow-ffi src/cli.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "check": "deno fmt --check && deno lint && deno check src/cli.ts src/client.ts src/types.ts src/filters.ts tests/*.ts",
+    "check": "deno fmt --check && deno lint && deno check src/release/main.ts scripts/release/*.ts src/cli.ts src/client.ts src/types.ts src/filters.ts tests/*.ts",
     "test": "DENO_SQLITE_PATH=.data/sqlite3 deno test --allow-env=DENO_SQLITE_PATH,DENO_SQLITE_LOCAL,FANTASY_API_URL --allow-ffi --allow-read=.data,/tmp --allow-write=.data,/tmp",
-    "sqlite:setup": "deno run --no-prompt --allow-read=.data,/lib,/usr/lib --allow-write=.data --allow-ffi=.data --allow-net=github.com,release-assets.githubusercontent.com src/data/setup.ts"
+    "sqlite:setup": "deno run --no-prompt --allow-read=.data,/lib,/usr/lib --allow-write=.data --allow-ffi=.data --allow-net=github.com,release-assets.githubusercontent.com src/data/setup.ts",
+    "build": "deno run -A scripts/release/build.ts",
+    "release:kit": "deno run --allow-read --allow-write=tmp/release scripts/release/kit.ts",
+    "release:smoke": "deno run -A scripts/release/smoke.ts"
   },
   "imports": {
     "@cliffy/command": "jsr:@cliffy/command@1.3.1",
@@ -29,13 +32,16 @@
       "docs/analysis.md",
       "docs/development.md",
       "docs/fantasy-advice-workflow.md",
-      ".github"
+      ".github",
+      "scripts/release",
+      "docs/releases.md"
     ]
   },
   "lint": {
     "include": [
       "src",
-      "tests"
+      "tests",
+      "scripts/release"
     ]
   }
 }
