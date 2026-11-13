@@ -77,3 +77,7 @@ account-specific API response.
 
 Third-party skills retain their upstream license and attribution. See
 [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+Executable build and release instructions are in
+[the release guide](docs/releases.md). The workflow creates a draft only after
+all platform builds pass; publication is manual.

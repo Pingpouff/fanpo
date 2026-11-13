@@ -92,3 +92,9 @@ and impact slots and nullable performance fields. Known fields are assumed to be
 present, with null used for missing performance data. The client preserves the
 API's slot order and does not enforce a fixed slot count. Tests use a synthetic
 17-slot fixture and do not contact production.
+
+## Executable releases
+
+See [the release guide](releases.md#build-and-release-as-a-maintainer) for
+pinned native inputs, platform builds, smoke tests, agent kit packaging and
+draft GitHub Releases. Source development continues to use `deno task cli`.

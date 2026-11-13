@@ -1,6 +1,12 @@
 # CLI reference
 
-[Start here](../README.md#quick-start) · [Agent guide](agents.md) ·
+The [standalone executable](releases.md) uses `fanpo` in place of
+`deno task cli`. `fanpo --version` reports its version.
+`fanpo skills export --output NEW_DIRECTORY` exports a complete offline agent
+kit; add `--json` for version and destination metadata. The parent directory
+must exist; an existing destination is never overwritten.
+
+[Start here](../README.md#quick-start-from-source) · [Agent guide](agents.md) ·
 [Configuration](getting-started.md)
 
 ## Commands
@@ -109,7 +115,7 @@ These options apply to `sync`, `data status`, `data players`, `analyze ...` and
 
 | Option             | Meaning / default                                                                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--db PATH`        | SQLite file; `.data/fanpo.sqlite`. Default task permissions cover `.data/`.                                                                            |
+| `--db PATH`        | SQLite file; per-user data directory for the executable, `.data/fanpo.sqlite` for source runs.                                                         |
 | `--season LABEL`   | Local scope, e.g. `2026-27`; inferred from an August season boundary. Does not select an upstream API season.                                          |
 | `--profile LABEL`  | Local account label; `default`. Use the same label across commands and a separate one per account.                                                     |
 | `--origin URL`     | Scope by API origin; defaults to `FANTASY_API_URL` or the production host. Must match configuration online.                                            |
@@ -136,10 +142,10 @@ deno task cli data players --club USAP --json --debug
 ```
 
 `sync` refreshes missing/stale sources by default, not necessarily every source;
-use `--force` for a full requested refresh. Run `deno task
-sqlite:setup` before
-any cached command. Custom paths outside `.data/` require a direct `deno run`
-invocation with suitable permissions; see native setup below.
+use `--force` for a full requested refresh. The executable includes SQLite and
+supports custom database/proposal paths directly. For source checkouts only, run
+`deno task sqlite:setup` before cached commands; paths outside `.data/` require
+a direct `deno run` invocation with suitable permissions.
 
 ### Request metadata (`--debug`)
 
@@ -275,17 +281,18 @@ command exits with an error identifying its endpoint and produces no partial
 output. Already-running requests finish before the error is reported; further
 requests stop being scheduled after a failure is detected.
 
-The CLI task includes `.env` loading and the required permissions, so no extra
-flags are needed:
+The executable reads process variables and its per-user configuration file, with
+SQLite included. The source CLI task additionally loads local `.env` and sets
+its Deno permissions; no extra flags are needed for normal use:
 
 ```bash
 deno task cli player 825 --detailed --json
 ```
 
-The default task grants the configuration variables, API network access to
+The source task grants the configuration variables, API network access to
 `fantasy.poneeey.fr:443`, `.data/` filesystem access and the native FFI required
 by SQLite. Inspection commands load no native library. To use a different API
-origin, grant its host and port explicitly:
+origin, run from source and grant its host and port explicitly:
 
 ```bash
 export FANTASY_API_URL=http://localhost:8000

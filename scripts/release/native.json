@@ -1,0 +1,19 @@
+{
+  "linuxSource": {
+    "url": "https://www.sqlite.org/2025/sqlite-amalgamation-3500400.zip",
+    "sha256": "1d3049dd0f830a025a53105fc79fd2ab9431aea99e137809d064d8ee8356b032",
+    "directory": "sqlite-amalgamation-3500400"
+  },
+  "x86_64-apple-darwin": {
+    "file": "libsqlite3.dylib",
+    "sha256": "19e61c7d9dd39b9899412aafca9d0f292d8ea58336f7c286b2af24822032533d"
+  },
+  "aarch64-apple-darwin": {
+    "file": "libsqlite3_aarch64.dylib",
+    "sha256": "7a6e8b38e0153fa0f7860f7ea764ccb930ec8ae327e22d2274bbeea6eb311efd"
+  },
+  "x86_64-pc-windows-msvc": {
+    "file": "sqlite3.dll",
+    "sha256": "7d14e5ff0168ba95b372b1aaebb5b9bcd49ec589edbb927d77ca0c2b25b8c2ae"
+  }
+}

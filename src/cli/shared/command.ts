@@ -4,10 +4,13 @@ import type { FantasyClient } from "../../api/client.ts";
 import type { Competition } from "../../api/competition.ts";
 
 export interface CommandContext {
+  defaultDatabase?: string;
+  prepareSqlite?: () => Promise<void>;
   getClient: () => FantasyClient;
   getCompetition: () => Competition;
   recordDataAccess?: (event: DataAccessMetadata) => void;
   setOutput: (output: string) => void;
+  setHelpOutput?: (output: string) => void;
 }
 
 export function createCommand() {
@@ -42,6 +45,8 @@ export function createCommand() {
 /** Command groups return the same help as --help, without direct console I/O. */
 export function groupCommand(description: string, context: CommandContext) {
   return createCommand().description(description).action(function () {
-    context.setOutput(this.getHelp({ colors: false }));
+    (context.setHelpOutput ?? context.setOutput)(
+      this.getHelp({ colors: false }),
+    );
   });
 }
