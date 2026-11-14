@@ -21,20 +21,24 @@ functions; `src/operations` coordinates refresh and analysis. The CLI exposes
 these operations as structured evidence for an external AI agent. No LLM or
 automatic lineup optimizer is embedded.
 
-Provision the native SQLite library once:
+The standalone executable includes SQLite and extracts it offline when needed.
+Its database defaults to your per-user application data directory; `--db` can
+select another path. See [release storage and configuration](releases.md).
+
+For a **source checkout**, provision the native SQLite library once:
 
 ```sh
 deno task sqlite:setup
 ```
 
-On Linux this prefers the installed system SQLite, avoiding glibc
-incompatibility with the package's prebuilt release. Other platforms download
-the pinned release. The library is stored at `.data/sqlite3`. `@db/sqlite`
-requires unrestricted FFI permission for pointer operations; the CLI grants it
-while restricting ordinary filesystem access to `.data` and API network access
-to the existing host. FFI itself is privileged native code. To use a different
-library or filesystem paths, run `src/cli.ts` directly with `DENO_SQLITE_PATH`
-and suitable permissions.
+In source checkouts, on Linux this prefers the installed system SQLite, avoiding
+glibc incompatibility with the package's prebuilt release. Other platforms
+download the pinned release. The library is stored at `.data/sqlite3`.
+`@db/sqlite` requires unrestricted FFI permission for pointer operations; the
+CLI grants it while restricting ordinary filesystem access to the local
+data/reference files and API network access to the existing host. FFI itself is
+privileged native code. To use a different library or filesystem paths, run
+`src/cli.ts` directly with `DENO_SQLITE_PATH` and suitable permissions.
 
 ```sh
 deno task cli top14 standings --json
@@ -58,16 +62,17 @@ sources; `--offline` uses SQLite without loading credentials. Help also needs no
 credentials or native permissions. Existing player/composition commands continue
 to fetch raw API data.
 
-The default database is `.data/fanpo.sqlite`, scoped by API origin, season and
-local profile and competition. Use `--season 2026-27 --profile my-team`
-consistently across operations. The default season is inferred from an August
-season boundary; `--season` labels local storage, and does not request a
-different season from the upstream API. Use a separate profile for each account.
-Online `--origin` must match `FANTASY_API_URL`. Tokens are never stored. Raw
-response snapshots retain their fetch timestamp and SHA-256 hash alongside
-indexed entities; a source refresh commits snapshot and normalized rows
-together. Failed refreshes retain prior data and report warnings while
-successful sources still persist.
+The default database is `.data/fanpo.sqlite` for source runs (the executable
+uses the per-user data directory), scoped by API origin, season and local
+profile and competition. Use `--season 2026-27 --profile my-team` consistently
+across operations. The default season is inferred from an August season
+boundary; `--season` labels local storage, and does not request a different
+season from the upstream API. Use a separate profile for each account. Online
+`--origin` must match `FANTASY_API_URL`. Tokens are never stored. Raw response
+snapshots retain their fetch timestamp and SHA-256 hash alongside indexed
+entities; a source refresh commits snapshot and normalized rows together. Failed
+refreshes retain prior data and report warnings while successful sources still
+persist.
 
 Freshness limits: locks 60 seconds; composition, prices, teamsheets, ratings and
 round 5 minutes; fixtures and standings 6 hours; fiches 24 hours. A target-round

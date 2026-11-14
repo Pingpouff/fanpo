@@ -1,3 +1,4 @@
+import { VERSION } from "./release/version.ts";
 import { humanColors } from "./cli/shared/colors.ts";
 import { type CommandMetadata, renderMetadata } from "./cli/shared/metadata.ts";
 import type { RequestMetadata } from "./api/http.ts";
@@ -8,17 +9,34 @@ import { contextCommands } from "./cli/context/command.ts";
 import { FantasyClient } from "./client.ts";
 import { loadConfig } from "./config.ts";
 import { type Competition, competitionName } from "./api/competition.ts";
-import { type CommandContext, createCommand } from "./cli/shared/command.ts";
+import {
+  type CommandContext,
+  createCommand,
+  groupCommand,
+} from "./cli/shared/command.ts";
 import { playersCommand } from "./cli/joueurs/command.ts";
 import { playerSheetCommand } from "./cli/joueurs/fiche/command.ts";
 import { compositionCommand } from "./cli/composition/command.ts";
+
+export interface CliRuntime {
+  name?: string;
+  defaultDatabase?: string;
+  prepareSqlite?: () => Promise<void>;
+}
 
 /** Build a fresh command tree per invocation; only the entry point writes output. */
 export async function runCli(
   args: readonly string[],
   client?: FantasyClient,
   onMetadata?: (metadata: CommandMetadata) => void,
+  runtime: CliRuntime = {},
 ): Promise<string> {
+  const formatHelp = (text: string) =>
+    runtime.name
+      ? text.replaceAll("deno task cli", runtime.name)
+        .replaceAll("First run: deno task sqlite:setup.", "SQLite is included.")
+        .replaceAll("First run deno task sqlite:setup;", "SQLite is included;")
+      : text;
   let output = "";
   let debug = false;
   let noColor = false;
@@ -35,6 +53,8 @@ export async function runCli(
     return client;
   };
   const context: CommandContext = {
+    defaultDatabase: runtime.defaultDatabase,
+    prepareSqlite: runtime.prepareSqlite,
     getClient,
     getCompetition: () => competition,
     get recordDataAccess() {
@@ -44,6 +64,9 @@ export async function runCli(
         }
         : undefined;
     },
+    setHelpOutput: (value) => {
+      output = formatHelp(value);
+    },
     setOutput: (value) => {
       output = value;
     },
@@ -51,8 +74,41 @@ export async function runCli(
   const root = createCommand();
   contextCommands(root, context);
   analysisCommands(root, context);
+  root.command(
+    "skills",
+    groupCommand("Export the version-matched, offline agent kit.", context)
+      .command(
+        "export",
+        createCommand()
+          .description(
+            "Export Fantasy Rugby skills, rules and references to a new directory.",
+          )
+          .option(
+            "--output <directory:string>",
+            "New destination directory (parent must exist).",
+            { required: true },
+          )
+          .option("--json", "Structured export result.")
+          .action(async (options) => {
+            const { collectKit, exportKit } = await import("./release/kit.ts");
+            await exportKit(options.output, await collectKit());
+            output = options.json
+              ? JSON.stringify(
+                { version: VERSION, directory: options.output },
+                null,
+                2,
+              )
+              : `Exported Fanpo ${VERSION} agent kit to ${options.output}. Read AGENTS.md to start.`;
+          }),
+      ),
+  );
+  root.reset();
   const command = root
-    .name("deno task cli")
+    .name(runtime.name ?? "deno task cli")
+    .version(VERSION)
+    .versionOption("-V, --version", "Show the Fanpo version.", () => {
+      output = VERSION;
+    })
     .globalOption(
       "--nationchampionship",
       "Use Nations Championship instead of Top 14 (including its separate cache).",
@@ -76,7 +132,9 @@ export async function runCli(
     .description(
       "Inspect live Fantasy Rugby data, cache it and compare projected lineups.\n" +
         "Colored tables by default; use --no-color for plain text or --json for structured output.\n" +
-        "Online requests need FANTASY_TOKEN (.env). Cached analysis also needs deno task sqlite:setup.\n" +
+        (runtime.name === "fanpo"
+          ? "Online requests need FANTASY_TOKEN (environment or user configuration). SQLite is included.\n"
+          : "Online requests need FANTASY_TOKEN (.env). Cached analysis also needs deno task sqlite:setup.\n") +
         "Run any command with --help for its options and examples.",
     )
     .example("Current team and salary cap", "deno task cli composition")
@@ -87,14 +145,18 @@ export async function runCli(
     .example("Detailed help", "deno task cli analyze lineup --help")
     .noExit()
     .helpOption("-h, --help", "Show this help.", function () {
-      output = this.getName() === root.getName()
-        ? groupRootHelp(this.getHelp({ colors: false }))
-        : this.getHelp({ colors: false });
+      output = formatHelp(
+        this.getName() === root.getName()
+          ? groupRootHelp(this.getHelp({ colors: false }))
+          : this.getHelp({ colors: false }),
+      );
     })
     .action(function () {
-      output = this.getName() === root.getName()
-        ? groupRootHelp(this.getHelp({ colors: false }))
-        : this.getHelp({ colors: false });
+      output = formatHelp(
+        this.getName() === root.getName()
+          ? groupRootHelp(this.getHelp({ colors: false }))
+          : this.getHelp({ colors: false }),
+      );
     })
     .command("players", playersCommand(context))
     .command("player", playerSheetCommand(context))
@@ -174,13 +236,16 @@ export async function runCli(
   );
 }
 
-if (import.meta.main) {
+export async function cliMain(
+  args: readonly string[] = Deno.args,
+  runtime: CliRuntime = {},
+): Promise<void> {
   let metadata: CommandMetadata | undefined;
   try {
     console.log(
-      await runCli(Deno.args, undefined, (value) => {
+      await runCli(args, undefined, (value) => {
         metadata = value;
-      }),
+      }, runtime),
     );
   } catch (error) {
     const message = error instanceof Error
@@ -188,14 +253,16 @@ if (import.meta.main) {
       : "Unexpected failure.";
     console.error(
       metadata
-        ? (Deno.args.some((arg) => arg === "--json" || arg === "--json=true")
+        ? (args.some((arg) => arg === "--json" || arg === "--json=true")
           ? JSON.stringify({ error: message, metadata }, null, 2)
           : humanColors(
             `Error: ${message}\n\n${renderMetadata(metadata)}`,
-            Deno.args.includes("--no-color"),
+            args.includes("--no-color"),
           ))
-        : humanColors(`Error: ${message}`, Deno.args.includes("--no-color")),
+        : humanColors(`Error: ${message}`, args.includes("--no-color")),
     );
     Deno.exitCode = 1;
   }
 }
+
+if (import.meta.main) await cliMain();

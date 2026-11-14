@@ -18,8 +18,9 @@ terminal-capable agent the same commands you use. Fanpo handles acquisition,
 local storage, projections and rule checks; your agent investigates the choices
 and explains the tradeoffs. No LLM API key is needed by Fanpo.
 
-[Quick start](#quick-start) · [Use with an agent](#use-with-an-agent) ·
-[CLI reference](docs/cli.md) · [How analysis works](docs/analysis.md)
+[Quick start](#quick-start-from-source) ·
+[Use with an agent](#use-with-an-agent) · [CLI reference](docs/cli.md) ·
+[How analysis works](docs/analysis.md)
 
 ## What you can do
 
@@ -37,7 +38,28 @@ and explains the tradeoffs. No LLM API key is needed by Fanpo.
 The CLI reads the Fantasy service and writes its local cache. It does **not**
 submit transfers or change your team on the website.
 
-## Quick start
+## Install the executable
+
+Download your platform archive from
+[GitHub Releases](https://github.com/Pingpouff/fanpo/releases) when v0.1.0 is
+published. Linux and macOS x64/ARM64 and Windows x64 builds include SQLite and
+the runtime: **no Deno installation needed**.
+
+```sh
+fanpo --help
+fanpo composition
+fanpo sync
+fanpo analyze lineup --offline --json
+fanpo skills export --output ./fanpo-agent-kit
+```
+
+Configure `FANTASY_TOKEN` first. See
+[installation, configuration and updates](docs/releases.md) for download
+verification, platform requirements and per-user data locations. The exported
+agent kit contains version-matched skills, game rules and workflow references;
+ask your agent to read its `AGENTS.md`.
+
+## Quick start from source
 
 You need
 **[Deno 2.9+](https://docs.deno.com/runtime/getting_started/installation/)** and
@@ -186,3 +208,8 @@ access. [Architecture and development details →](docs/development.md)
 Fanpo is an independent tool for the Fantasy service. Access to that service and
 its data remains subject to its own terms. Third-party components retain their
 own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+## License
+
+[MIT](LICENSE). Third-party components retain their
+[own licenses](THIRD_PARTY_NOTICES.md).
