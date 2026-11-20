@@ -78,17 +78,27 @@ export function parseEnvironment(
   return result;
 }
 
-export async function loadUserEnvironment(path: string): Promise<void> {
-  let text: string;
+async function readEnvironment(path: string): Promise<string> {
   try {
-    text = await Deno.readTextFile(path);
+    return await Deno.readTextFile(path);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof Deno.errors.NotFound) return "";
     throw error;
   }
+}
+
+/** Local dotenv values win, followed by process values and user configuration. */
+export async function loadUserEnvironment(
+  path: string,
+  localPath = ".env",
+): Promise<void> {
+  const local = parseEnvironment(await readEnvironment(localPath), {});
   const values = parseEnvironment(
-    text,
-    Object.fromEntries(keys.map((key) => [key, Deno.env.get(key)])),
+    await readEnvironment(path),
+    {
+      ...Object.fromEntries(keys.map((key) => [key, Deno.env.get(key)])),
+      ...local,
+    },
   );
   for (const [key, value] of Object.entries(values)) Deno.env.set(key, value);
 }
