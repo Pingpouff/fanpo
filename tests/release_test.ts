@@ -1,8 +1,13 @@
 import { assert, equal, rejects, throws } from "./helpers.ts";
-import { applicationPaths, parseEnvironment } from "../src/release/config.ts";
+import {
+  applicationPaths,
+  loadUserEnvironment,
+  parseEnvironment,
+} from "../src/release/config.ts";
 import { extractLibrary } from "../src/release/sqlite.ts";
 import { exportKit } from "../src/release/kit.ts";
 import { runCli } from "../src/cli.ts";
+import { VERSION } from "../src/release/version.ts";
 
 Deno.test("release paths respect platform conventions and XDG overrides", () => {
   equal(applicationPaths("linux", { HOME: "/users/test" }), {
@@ -54,6 +59,56 @@ Deno.test("release env parser preserves process values and rejects unsupported s
   );
 });
 
+Deno.test("release loads local dotenv before process and user configuration with missing-file fallback", async () => {
+  const directory = await Deno.makeTempDir();
+  const previous = Deno.env.get("FANTASY_API_URL");
+  const config = `${directory}/env`;
+  const local = `${directory}/.env`;
+  try {
+    await Deno.writeTextFile(config, "FANTASY_API_URL=https://user.invalid\n");
+    await Deno.writeTextFile(local, "FANTASY_API_URL=https://local.invalid\n");
+    Deno.env.set("FANTASY_API_URL", "https://process.invalid");
+    await loadUserEnvironment(config, local);
+    equal(Deno.env.get("FANTASY_API_URL"), "https://local.invalid");
+
+    // Missing local keys fall back individually, including empty process values.
+    await Deno.writeTextFile(local, "# no URL configured\n");
+    Deno.env.set("FANTASY_API_URL", "");
+    await loadUserEnvironment(config, local);
+    equal(Deno.env.get("FANTASY_API_URL"), "");
+
+    await Deno.remove(local);
+    Deno.env.set("FANTASY_API_URL", "https://process.invalid");
+    await loadUserEnvironment(config, local);
+    equal(Deno.env.get("FANTASY_API_URL"), "https://process.invalid");
+    Deno.env.delete("FANTASY_API_URL");
+    await loadUserEnvironment(config, local);
+    equal(Deno.env.get("FANTASY_API_URL"), "https://user.invalid");
+
+    await Deno.remove(config);
+    await Deno.writeTextFile(local, "FANTASY_API_URL=https://local.invalid\n");
+    await loadUserEnvironment(config, local);
+    equal(Deno.env.get("FANTASY_API_URL"), "https://local.invalid");
+    await Deno.writeTextFile(local, "FANTASY_API_URL=\n");
+    await loadUserEnvironment(config, local);
+    equal(Deno.env.get("FANTASY_API_URL"), "");
+
+    await Deno.writeTextFile(local, "FANTASY_API_URL='unterminated\n");
+    await rejects(
+      () => loadUserEnvironment(config, local),
+      "Invalid configuration",
+    );
+    await Deno.remove(local);
+    Deno.env.delete("FANTASY_API_URL");
+    await loadUserEnvironment(config, local);
+    equal(Deno.env.get("FANTASY_API_URL"), undefined);
+  } finally {
+    if (previous === undefined) Deno.env.delete("FANTASY_API_URL");
+    else Deno.env.set("FANTASY_API_URL", previous);
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("native extraction reuses verified content and recovers from corruption or failed validation", async () => {
   const dir = await Deno.makeTempDir();
   const path = `${dir}/native/sqlite3`;
@@ -101,7 +156,7 @@ Deno.test("agent kit export refuses overwrite, traversal and has matching versio
 });
 
 Deno.test("CLI version and skill help require no token or native initialization", async () => {
-  assert((await runCli(["--version"])).includes("0.1.0"));
+  equal((await runCli(["--version"])).trim(), VERSION);
   assert((await runCli(["skills", "export", "--help"])).includes("--output"));
 });
 

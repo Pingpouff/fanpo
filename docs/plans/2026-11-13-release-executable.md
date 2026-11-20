@@ -15,6 +15,12 @@ draft release; publication remains manual.
 - [ ] Verify checks, tests, compiled Linux smoke, kit references and final
       review.
 
+## Follow-up TODOs
+
+- [x] Load local `.env` first in the release executable, falling back per key to
+      process variables and per-user configuration; document and test usage.
+- [ ] Add an explicit `--env-file PATH` option for selecting another file.
+
 ## Decisions and evidence
 
 - Baseline: 123 tests passed before changes.

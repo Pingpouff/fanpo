@@ -157,8 +157,9 @@ cite source IDs/timestamps, target round, model version and the exact commands
 used. The full output contract is in the
 [advice workflow](fantasy-advice-workflow.md#final-validation-and-report).
 
-The user supplies a token through the process environment or the executable’s
-per-user configuration file (source checkouts can use local `.env`). Never read
-it into a prompt, print it, or add it to a report. Use the configured CLI;
-diagnose authentication by HTTP status. Request metadata deliberately excludes
-tokens and request headers.
+The user supplies a token through local `.env`, process variables or the
+executable’s per-user configuration file, in that precedence order. Source CLI
+runs give process variables precedence over `.env`. Never read it into a prompt,
+print it, or add it to a report. Use the configured CLI; diagnose authentication
+by HTTP status. Request metadata deliberately excludes tokens and request
+headers.

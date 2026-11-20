@@ -41,9 +41,9 @@ submit transfers or change your team on the website.
 ## Install the executable
 
 Download your platform archive from
-[GitHub Releases](https://github.com/Pingpouff/fanpo/releases) when v0.1.0 is
-published. Linux and macOS x64/ARM64 and Windows x64 builds include SQLite and
-the runtime: **no Deno installation needed**.
+[GitHub Releases](https://github.com/Pingpouff/fanpo/releases). Linux and macOS
+x64/ARM64 and Windows x64 builds include SQLite and the runtime: **no Deno
+installation needed**.
 
 ```sh
 fanpo --help
@@ -53,8 +53,9 @@ fanpo analyze lineup --offline --json
 fanpo skills export --output ./fanpo-agent-kit
 ```
 
-Configure `FANTASY_TOKEN` first. See
-[installation, configuration and updates](docs/releases.md) for download
+Configure `FANTASY_TOKEN` (without `Bearer`) in a local `.env` file first. The
+executable checks `.env`, then process variables, then per-user configuration.
+See [installation, configuration and updates](docs/releases.md) for download
 verification, platform requirements and per-user data locations. The exported
 agent kit contains version-matched skills, game rules and workflow references;
 ask your agent to read its `AGENTS.md`.
