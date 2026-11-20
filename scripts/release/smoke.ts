@@ -142,8 +142,7 @@ try {
     await Deno.writeFile(library, new Uint8Array([0]));
     await run(["data", "status", "--json"]);
   }
-  // A real user configuration is loaded, process overrides win, and working
-  // directory .env files are never read by the standalone executable.
+  // Without local dotenv values, process variables override user configuration.
   await Deno.mkdir(paths.config.replace(/[/\\][^/\\]+$/, ""), {
     recursive: true,
   });
@@ -167,15 +166,43 @@ try {
     overridden.scope.origin === "https://override.invalid",
     "Process override ignored",
   );
-  await Deno.remove(paths.config);
   await Deno.writeTextFile(
     `${directory}/.env`,
-    "FANTASY_TOKEN=must-not-load\n",
+    "FANTASY_API_URL=https://local.invalid\n",
+  );
+  const local = JSON.parse(
+    (await run(["data", "status", "--json"], true, {
+      FANTASY_API_URL: "https://override.invalid",
+    })).stdout,
   );
   assert(
-    (await run(["composition"], false)).stderr.includes("FANTASY_TOKEN"),
-    "Working directory token was loaded",
+    local.scope.origin === "https://local.invalid",
+    "Local dotenv must override process and user configuration",
   );
+  await Deno.remove(paths.config);
+  assert(
+    JSON.parse((await run(["data", "status", "--json"])).stdout).scope
+      .origin ===
+      "https://local.invalid",
+    "Local dotenv requires no user configuration file",
+  );
+  await Deno.writeTextFile(`${directory}/.env`, "FANTASY_TOKEN=\n");
+  assert(
+    (await run(["composition"], false, { FANTASY_TOKEN: "synthetic" })).stderr
+      .includes("FANTASY_TOKEN is required"),
+    "Empty local token must override process token without an API request",
+  );
+  await Deno.writeTextFile(
+    `${directory}/.env`,
+    "FANTASY_TOKEN='synthetic-unterminated\n",
+  );
+  const invalid = (await run(["data", "status", "--json"], false)).stderr;
+  assert(
+    invalid.includes("Invalid configuration") && !invalid.includes("synthetic"),
+    "Invalid dotenv diagnostic must not leak values",
+  );
+  await run(["--help"]);
+  await run(["--version"]);
   console.log(`Standalone smoke passed: ${Deno.build.target}`);
 } finally {
   // SQLite's FFI DLL remains loaded into this test process on Windows.

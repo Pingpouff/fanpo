@@ -281,9 +281,11 @@ command exits with an error identifying its endpoint and produces no partial
 output. Already-running requests finish before the error is reported; further
 requests stop being scheduled after a failure is detected.
 
-The executable reads process variables and its per-user configuration file, with
-SQLite included. The source CLI task additionally loads local `.env` and sets
-its Deno permissions; no extra flags are needed for normal use:
+The executable reads local `.env` first, then process variables, then its
+per-user configuration file, resolving each key independently (including empty
+values). SQLite is included. The source CLI task loads local `.env` with process
+variables taking precedence and sets its Deno permissions; no extra flags are
+needed for normal use:
 
 ```bash
 deno task cli player 825 --detailed --json

@@ -9,7 +9,7 @@ becomes publicly available when its maintainer publishes the draft.
 
 Download the archive for your system from
 [GitHub Releases](https://github.com/Pingpouff/fanpo/releases), together with
-`SHA256SUMS`. The first planned release is **v0.1.0**.
+`SHA256SUMS`. The current release version is **v0.1.1**.
 
 | System              | Asset suffix         | Requirements                        |
 | ------------------- | -------------------- | ----------------------------------- |
@@ -41,8 +41,9 @@ requirements; the smoke matrix uses Ubuntu 22.04, macOS 15, and Windows Server
 
 ## Configure once
 
-Set `FANTASY_TOKEN` in your process environment, or create the configuration
-file below. Use your token without the `Bearer` prefix; see
+Create a `.env` file in the directory where you run `fanpo`, set `FANTASY_TOKEN`
+in your process environment, or create the per-user configuration file below.
+Use your token without the `Bearer` prefix; see
 [how to find it](getting-started.md#get-your-token). Keep it private and outside
 agent prompts. On Unix, use file mode `600`; on Windows restrict access to your
 user account.
@@ -64,9 +65,20 @@ FANTASY_TOKEN=your-token
 The file accepts blank lines, `#` comment lines, and `KEY=value` entries with
 optional matching single/double quotes. Values are literal: no variable
 expansion, escapes, `export` prefixes, or inline comments. Supported keys are
-`FANTASY_TOKEN` and `FANTASY_API_URL`. Existing process values take precedence,
-including empty values. The executable does not automatically load a `.env` file
-from the working directory.
+`FANTASY_TOKEN` and `FANTASY_API_URL`. For each key, the executable checks
+`.env` in the current working directory first, then process variables, then the
+per-user configuration file. Missing files and keys fall through; explicitly
+empty values take precedence too. Both files use the format above. Malformed or
+unreadable files produce an error without printing their values. Help, version
+and skill export commands do not load configuration.
+
+`FANTASY_API_URL` defaults to `https://fantasy.poneeey.fr` when unset. For
+example:
+
+```dotenv
+FANTASY_TOKEN=your-token
+FANTASY_API_URL=https://fantasy.poneeey.fr
+```
 
 The compiled executable allows HTTPS requests to `fantasy.poneeey.fr:443`.
 Custom API hosts require the source CLI with explicit Deno network permissions.
@@ -98,7 +110,7 @@ fanpo skills export --output ./fanpo-agent-kit
 The parent directory must exist and the destination must be new. Export is
 offline and requires neither credentials nor writable application storage.
 `--json` reports its version and destination. A matching
-`fanpo-agent-kit-v0.1.0.zip` is also attached to the release.
+`fanpo-agent-kit-v0.1.1.zip` is also attached to the release.
 
 Open the exported directory with your terminal-capable agent and ask it to read
 `AGENTS.md`. It contains eight Fantasy Rugby skills under `.agents/skills/`,
@@ -147,7 +159,7 @@ For a public release:
    matrix workflow.
 2. Merge the feature into `develop`, then merge the release PR from `develop`
    into `main` using the documented merge-commit workflow.
-3. Tag the intended main commit `v0.1.0` and push the tag. Version metadata must
+3. Tag the intended main commit `v0.1.1` and push the tag. Version metadata must
    match, and the tagged commit must be an ancestor of `origin/main`.
 4. The workflow checks the code, builds and smoke-tests every platform,
    assembles five archives, the agent-kit ZIP and `SHA256SUMS`, then creates a
